@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Öğrenci Sınav Sonuçları Sorgulama</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Konfeti Kütüphanesi -->
+    <!-- Konfeti ve Havai Fişek Kütüphanesi -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 </head>
-<body class="bg-slate-50 min-h-screen flex flex-col justify-between font-sans">
+<body class="bg-slate-50 min-h-screen flex flex-col justify-between font-sans relative overflow-x-hidden">
 
     <!-- ÜST KISIM / BAŞLIK -->
     <header class="bg-indigo-600 text-white py-6 px-4 shadow-md text-center">
@@ -44,6 +44,37 @@
 
         <!-- SONUÇ EKRANI (KARNE GÖRÜNÜMÜ) -->
         {% if sonuc %}
+        
+        <!-- İLK 3'E GİRENLER İÇİN DEV EKRAN KUTLAMA ANİMASYONU VE MODALI -->
+        {% set top_rank = none %}
+        {% for sinav in sonuc.sinavlar %}
+            {% set d = sinav.derece|string|replace('.', '')|trim|lower if sinav.derece else '' %}
+            {% if d in ['1', '2', '3'] and not top_rank %}
+                {% set top_rank = sinav.derece %}
+            {% endif %}
+        {% endfor %}
+
+        {% if top_rank %}
+        <!-- Tam Ekran Dikkat Çekici Kutlama Pop-up / Banner Alanı -->
+        <div id="kutlamaModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-opacity duration-500">
+            <div class="bg-gradient-to-br from-amber-400 via-yellow-400 to-amber-500 text-slate-900 rounded-3xl p-8 max-w-md w-full shadow-2xl text-center space-y-4 border-4 border-white transform scale-100 transition-transform duration-300">
+                <div class="inline-flex items-center justify-center w-24 h-24 bg-white rounded-full shadow-inner text-5xl font-black text-amber-600 border-4 border-amber-200 mx-auto animate-bounce">
+                    {{ top_rank }}
+                </div>
+                <div class="space-y-2">
+                    <span class="bg-slate-900 text-amber-300 text-xs font-black uppercase px-3 py-1 rounded-full tracking-widest shadow-sm">🏆 SINIF DERECESİ</span>
+                    <h2 class="text-2xl font-black text-slate-900 tracking-tight">MUHTEŞEM BAŞARI!</h2>
+                    <p class="text-sm font-bold text-slate-800 leading-relaxed px-2">
+                        "Tebrikler! Sınıf içinde gösterdiğin bu üstün başarıdan dolayı seni kutluyorum."
+                    </p>
+                </div>
+                <button onclick="kapatKutlama()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-2xl transition shadow-lg text-sm tracking-wide">
+                    Karneyi İncele 👀
+                </button>
+            </div>
+        </div>
+        {% endif %}
+
         <div class="bg-white p-6 md:p-8 rounded-2xl shadow-md border border-slate-200 space-y-6">
             
             <!-- ÖĞRENCİ KİMLİK BİLGİSİ -->
@@ -65,18 +96,10 @@
                 <h3 class="text-sm font-bold text-slate-700">Sınav Sonuçları ve Karne Geçmişi</h3>
                 
                 <div class="space-y-3">
-                    {% set has_top_rank = false %}
-                    {% for sinav in sonuc.sinavlar %}
-                        {% set d = sinav.derece|string|replace('.', '')|trim|lower if sinav.derece else '' %}
-                        {% if d in ['1', '2', '3'] %}
-                            {% set has_top_rank = true %}
-                        {% endif %}
-                    {% endfor %}
-
                     {% for sinav in sonuc.sinavlar %}
                     <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3 hover:border-indigo-200 transition">
                         
-                        <!-- İLK 3 İÇİN ÖZEL KUTLAMA MESAJI -->
+                        <!-- SINAV KARTI İÇİNDEKİ KUTLAMA MESAJI -->
                         {% set d = sinav.derece|string|replace('.', '')|trim|lower if sinav.derece else '' %}
                         {% if d in ['1', '2', '3'] %}
                         <div class="p-3 bg-gradient-to-r from-amber-500 to-yellow-500 text-white rounded-xl shadow-sm flex items-center gap-3">
@@ -126,31 +149,44 @@
 
         </div>
 
-        <!-- HAVAİ FİŞEK / KONFETİ ANİMASYONU (2 SANİYE) -->
-        {% if has_top_rank %}
+        <!-- EKRANI KAPLAYAN DEV HAVAİ FİŞEK VE 3 SANİYELİK OTOMATİK KAPANMA ANİMASYONU -->
+        {% if top_rank %}
         <script>
+            function kapatKutlama() {
+                const modal = document.getElementById('kutlamaModal');
+                if(modal) {
+                    modal.style.opacity = '0';
+                    setTimeout(() => modal.remove(), 300);
+                }
+            }
+
             window.addEventListener('DOMContentLoaded', (event) => {
-                var duration = 2 * 1000;
-                var end = Date.now() + duration;
+                // 3 saniye boyunca devasa havai fişek şöleni
+                var duration = 3 * 1000;
+                var animationEnd = Date.now() + duration;
+                var defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 99999 };
 
-                (function frame() {
-                    confetti({
-                        particleCount: 7,
-                        angle: 60,
-                        spread: 55,
-                        origin: { x: 0 }
-                    });
-                    confetti({
-                        particleCount: 7,
-                        angle: 120,
-                        spread: 55,
-                        origin: { x: 1 }
-                    });
+                function randomInRange(min, max) {
+                    return Math.random() * (max - min) + min;
+                }
 
-                    if (Date.now() < end) {
-                        requestAnimationFrame(frame);
+                var interval = setInterval(function() {
+                    var timeLeft = animationEnd - Date.now();
+
+                    if (timeLeft <= 0) {
+                        return clearInterval(interval);
                     }
-                }());
+
+                    var particleCount = 50 * (timeLeft / duration);
+                    // Havai fişek patlamaları her köşeden ve merkezden
+                    confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } }));
+                    confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
+                }, 250);
+
+                // 3.5 saniye sonra kutlama pop-up'ını otomatik kapat (veya kullanıcı butona basabilir)
+                setTimeout(() => {
+                    kapatKutlama();
+                }, 3500);
             });
         </script>
         {% endif %}

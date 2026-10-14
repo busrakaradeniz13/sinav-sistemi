@@ -18,12 +18,8 @@ app = Flask(__name__)
 app.secret_key = "ogretmen_cok_gizli_guvenlik_anahtari_98765"
 
 ADMIN_PASSWORD = "1234"
-
-# BULUT DİSK KORUMASI: Eğer kalıcı bir dizin (Render disk vb.) varsa oraya kaydet, yoksa yerel klasör kullan
-VERITABANI_DIZINI = os.environ.get(
-    "RENDER_DISK_PATH", "."
-)  # Kalıcı disk yolu tanımlıysa onu kullanır
-DB_DOSYA_YOLU = os.path.join(VERITABANI_DIZINI, "notlar.db")
+DB_DOSYA_YOLU = "notlar.db"
+YEDEK_EXCEL_YOLU = "otomatik_yedek.xlsx"
 
 
 def db_baglantisi():
@@ -33,7 +29,7 @@ def db_baglantisi():
 
 
 def veritabani_kur():
-  """Veritabanını ve tabloları otomatik oluşturur"""
+  """Veritabanını kurar ve sıfırlanmışsa otomatik yedekten geri yükler."""
   conn = db_baglantisi()
   cursor = conn.cursor()
 
@@ -60,15 +56,112 @@ def veritabani_kur():
     """)
 
   conn.commit()
+
+  # Veritabanı boş mu kontrol et
+  cursor.execute("SELECT COUNT(*) as sayi FROM ogrenciler")
+  ogrenci_sayisi = cursor.fetchone()["sayi"]
   conn.close()
 
+  # Eğer veritabanı sıfırlanmışsa ve otomatik yedek dosyası varsa GERİ YÜKLE
+  if ogrenci_sayisi == 0 and os.path.exists(YEDEK_EXCEL_YOLU):
+    excelden_otomatik_kur(YEDEK_EXCEL_YOLU)
 
-# Uygulama başladığında veritabanını hazırla
+
+def excel_otomatik_senkronize():
+  """Veritabanındaki son durumu otomatik yedek Excel dosyasına yazar."""
+  try:
+    sinav_verileri = sinav_verilerini_getir()
+    satirlar = []
+
+    for no, bilgi in sinav_verileri.items():
+      ad = bilgi["ad"]
+      for s in bilgi["sinavlar"]:
+        satirlar.append({
+            "ogrenci_no": no,
+            "ad": ad,
+            "sinav": s["sinav"],
+            "dogru": s["dogru"],
+            "yanlis": s["yanlis"],
+            "bos": s["bos"],
+            "puan": s["puan"],
+            "derece": s.get("derece", ""),
+        })
+
+    if satirlar:
+      df = pd.DataFrame(satirlar)
+      df.to_excel(YEDEK_EXCEL_YOLU, index=False)
+  except Exception as e:
+    print(f"Otomatik yedek oluşturma hatası: {e}")
+
+
+def excelden_otomatik_kur(dosya_yolu):
+  """Sıfırlanma sonrası Excel'den otomatik geri aktarma yapar."""
+  try:
+    df = pd.read_excel(dosya_yolu)
+    df.columns = [str(col).strip().lower() for col in df.columns]
+
+    conn = db_baglantisi()
+    cursor = conn.cursor()
+
+    for _, row in df.iterrows():
+      no = str(
+          row.get("ogrenci_no", row.get("no", row.get("okul_no", "0")))
+      ).strip()
+      ad = str(row.get("ad", row.get("ad_soyad", "İsimsiz"))).strip()
+      sinav_adi = str(
+          row.get("sinav", row.get("sinav_adi", "Genel Sınav"))
+      ).strip()
+
+      try:
+        dogru = int(row.get("dogru", 0) if pd.notna(row.get("dogru", 0)) else 0)
+        yanlis = int(
+            row.get("yanlis", 0) if pd.notna(row.get("yanlis", 0)) else 0
+        )
+        bos = int(row.get("bos", 0) if pd.notna(row.get("bos", 0)) else 0)
+        puan = int(row.get("puan", 0) if pd.notna(row.get("puan", 0)) else 0)
+        derece = str(
+            row.get("derece", "") if pd.notna(row.get("derece", "")) else ""
+        ).strip()
+        if derece == "nan":
+          derece = ""
+      except:
+        dogru, yanlis, bos, puan, derece = 0, 0, 0, 0, ""
+
+      if no and no != "nan":
+        cursor.execute(
+            """
+                    INSERT INTO ogrenciler (ogrenci_no, ad) VALUES (?, ?)
+                    ON CONFLICT(ogrenci_no) DO UPDATE SET ad = excluded.ad
+                """,
+            (no, ad),
+        )
+
+        cursor.execute(
+            """
+                    INSERT INTO sinavlar (ogrenci_no, sinav, dogru, yanlis, bos, puan, derece)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(ogrenci_no, sinav) DO UPDATE SET
+                        dogru = excluded.dogru,
+                        yanlis = excluded.yanlis,
+                        bos = excluded.bos,
+                        puan = excluded.puan,
+                        derece = excluded.derece
+                """,
+            (no, sinav_adi, dogru, yanlis, bos, puan, derece),
+        )
+
+    conn.commit()
+    conn.close()
+    print("Sıfırlanan veritabanı otomatik yedekten geri yüklendi!")
+  except Exception as e:
+    print(f"Otomatik kurtarma hatası: {e}")
+
+
+# Uygulama başlarken veritabanı ve kurtarma kontrolü
 veritabani_kur()
 
 
 def sinav_verilerini_getir():
-  """Veritabanındaki tüm öğrencileri ve sınavlarını sözlük yapısında döndürür"""
   conn = db_baglantisi()
   cursor = conn.cursor()
 
@@ -239,6 +332,10 @@ def ogrenci_kaydet():
 
     conn.commit()
     conn.close()
+
+    # Otomatik Yedek Dosyasını Güncelle
+    excel_otomatik_senkronize()
+
     flash(f"Başarılı: {ad} - {sinav_adi} kaydedildi.", "success")
 
   return redirect(url_for("admin_panel"))
@@ -260,6 +357,8 @@ def ogrenci_sil(ogrenci_no):
   conn.commit()
   conn.close()
 
+  excel_otomatik_senkronize()
+
   flash("Öğrenci veritabanından silindi.", "info")
   return redirect(url_for("admin_panel"))
 
@@ -277,6 +376,8 @@ def sinav_sil(ogrenci_no, sinav_adi):
   )
   conn.commit()
   conn.close()
+
+  excel_otomatik_senkronize()
 
   flash("Sınav sonucu silindi.", "info")
   return redirect(url_for("admin_panel"))
@@ -347,11 +448,14 @@ def excel_yukle():
 
       conn.commit()
       conn.close()
+
+      excel_otomatik_senkronize()
+
       flash("Excel verileri veritabanına aktarıldı!", "success")
     except Exception as e:
       flash(f"Excel yüklenirken hata: {str(e)}", "error")
 
-  return timedelta if False else redirect(url_for("admin_panel"))
+  return redirect(url_for("admin_panel"))
 
 
 @app.route("/admin/excel-indir")

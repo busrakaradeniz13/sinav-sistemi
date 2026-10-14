@@ -5,22 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Öğrenci Sınav Sonuçları Sorgulama</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Kararlı Konfeti Kütüphanesi -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
         @keyframes popUp {
             0% { transform: scale(0.6); opacity: 0; }
             70% { transform: scale(1.05); opacity: 1; }
             100% { transform: scale(1); opacity: 1; }
         }
-        @keyframes glow {
-            0%, 100% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.5); }
-            50% { box-shadow: 0 0 45px rgba(245, 158, 11, 0.9); }
-        }
         .animate-celebration {
-            animation: popUp 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards, glow 2s infinite ease-in-out;
+            animation: popUp 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
     </style>
 </head>
-<body class="bg-slate-50 min-h-screen flex flex-col justify-between font-sans">
+<body class="bg-slate-50 min-h-screen flex flex-col justify-between font-sans relative overflow-x-hidden">
 
     <!-- ÜST BAŞLIK -->
     <header class="bg-indigo-600 text-white py-6 px-4 shadow-md text-center">
@@ -57,7 +55,7 @@
         <!-- SONUÇ EKRANI -->
         {% if sonuc %}
 
-        <!-- İLK 3'E GİRENLER İÇİN ANİMASYONLU KUTLAMA ALANI -->
+        <!-- İLK 3'E GİRENLER İÇİN KUTLAMA ALANI -->
         {% if en_iyi_derece %}
         <div class="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 p-6 md:p-8 rounded-3xl shadow-2xl text-slate-900 text-center space-y-4 border-4 border-white animate-celebration">
             <div class="inline-flex items-center justify-center w-24 h-24 bg-white rounded-full shadow-xl text-5xl font-black text-amber-600 border-4 border-amber-200">
@@ -103,7 +101,7 @@
                             <span class="font-bold text-slate-800 text-sm">{{ sinav.sinav }}</span>
                             {% if sinav.derece %}
                             <span class="bg-amber-100 text-amber-800 text-xs font-extrabold px-3 py-1 rounded-xl border border-amber-200 shadow-xs">
-                                🏆 Sınıf Derecesi: {{ sinav.derece }}
+                                🏆 Sınav Derecesi: {{ sinav.derece }}
                             </span>
                             {% endif %}
                         </div>
@@ -135,7 +133,36 @@
 
         </div>
 
+        <!-- 2 SANİYELİK UÇUŞAN HAVAİ FİŞEK VE KONFETİ MOTORU -->
+        {% if en_iyi_derece %}
+        <script>
+            window.addEventListener('DOMContentLoaded', (event) => {
+                var duration = 2 * 1000; // Tam 2 saniye
+                var animationEnd = Date.now() + duration;
+                var defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 1000 };
+
+                function randomInRange(min, max) {
+                    return Math.random() * (max - min) + min;
+                }
+
+                var interval = setInterval(function() {
+                    var timeLeft = animationEnd - Date.now();
+
+                    if (timeLeft <= 0) {
+                        return clearInterval(interval);
+                    }
+
+                    var particleCount = 50 * (timeLeft / duration);
+                    
+                    // Ekranın hem solundan hem sağından havaya uçuşan havai fişek/konfetiler
+                    confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } }));
+                    confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
+                }, 250);
+            });
+        </script>
         {% endif %}
+        {% endif %}
+
     </main>
 
     <footer class="text-center py-4 text-xs text-slate-400 border-t border-slate-200 mt-8">

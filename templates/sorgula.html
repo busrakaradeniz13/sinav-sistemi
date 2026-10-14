@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Öğrenci Sınav Sonuçları Sorgulama</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Konfeti Kütüphanesi -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 </head>
 <body class="bg-slate-50 min-h-screen flex flex-col justify-between font-sans">
 
@@ -63,11 +65,19 @@
                 <h3 class="text-sm font-bold text-slate-700">Sınav Sonuçları ve Karne Geçmişi</h3>
                 
                 <div class="space-y-3">
+                    {% set has_top_rank = false %}
+                    {% for sinav in sonuc.sinavlar %}
+                        {% set d = sinav.derece|string|replace('.', '')|trim|lower if sinav.derece else '' %}
+                        {% if d in ['1', '2', '3'] %}
+                            {% set has_top_rank = true %}
+                        {% endif %}
+                    {% endfor %}
+
                     {% for sinav in sonuc.sinavlar %}
                     <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3 hover:border-indigo-200 transition">
                         
-                        <!-- İLK 3 İÇİN ÖZEL KUTLAMA MESAJI (Esnek Kontrol) -->
-                        {% set d = sinav.derece|string|replace('.', '')|strip|lower if sinav.derece else '' %}
+                        <!-- İLK 3 İÇİN ÖZEL KUTLAMA MESAJI -->
+                        {% set d = sinav.derece|string|replace('.', '')|trim|lower if sinav.derece else '' %}
                         {% if d in ['1', '2', '3'] %}
                         <div class="p-3 bg-gradient-to-r from-amber-500 to-yellow-500 text-white rounded-xl shadow-sm flex items-center gap-3">
                             <span class="text-2xl">🎉</span>
@@ -115,6 +125,35 @@
             </div>
 
         </div>
+
+        <!-- HAVAİ FİŞEK / KONFETİ ANİMASYONU (2 SANİYE) -->
+        {% if has_top_rank %}
+        <script>
+            window.addEventListener('DOMContentLoaded', (event) => {
+                var duration = 2 * 1000;
+                var end = Date.now() + duration;
+
+                (function frame() {
+                    confetti({
+                        particleCount: 7,
+                        angle: 60,
+                        spread: 55,
+                        origin: { x: 0 }
+                    });
+                    confetti({
+                        particleCount: 7,
+                        angle: 120,
+                        spread: 55,
+                        origin: { x: 1 }
+                    });
+
+                    if (Date.now() < end) {
+                        requestAnimationFrame(frame);
+                    }
+                }());
+            });
+        </script>
+        {% endif %}
         {% endif %}
 
     </main>

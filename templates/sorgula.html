@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Öğrenci Sınav Sonuçları Sorgulama</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Kararlı Konfeti Kütüphanesi -->
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
         @keyframes popUp {
             0% { transform: scale(0.6); opacity: 0; }
@@ -16,9 +14,36 @@
         .animate-celebration {
             animation: popUp 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
+
+        /* YERLEŞİK HAREKETLİ KONFETİ VE HAVAİ FİŞEK ANİMASYONU */
+        #fxContainer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 99999;
+            overflow: hidden;
+            display: none;
+        }
+        .confetti-piece {
+            position: absolute;
+            width: 10px;
+            height: 16px;
+            opacity: 0.9;
+            animation: fall linear forwards;
+        }
+        @keyframes fall {
+            0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(105vh) rotate(720deg); opacity: 0; }
+        }
     </style>
 </head>
 <body class="bg-slate-50 min-h-screen flex flex-col justify-between font-sans relative overflow-x-hidden">
+
+    <!-- EKRANI KAPLAYAN HAREKETLİ KONFETİ ALANI -->
+    <div id="fxContainer"></div>
 
     <!-- ÜST BAŞLIK -->
     <header class="bg-indigo-600 text-white py-6 px-4 shadow-md text-center">
@@ -133,31 +158,32 @@
 
         </div>
 
-        <!-- 2 SANİYELİK UÇUŞAN HAVAİ FİŞEK VE KONFETİ MOTORU -->
+        <!-- YERLEŞİK HAREKETLİ 2 SANİYELİK KONFETİ TETİKLEYİCİSİ -->
         {% if en_iyi_derece %}
         <script>
-            window.addEventListener('DOMContentLoaded', (event) => {
-                var duration = 2 * 1000; // Tam 2 saniye
-                var animationEnd = Date.now() + duration;
-                var defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 1000 };
-
-                function randomInRange(min, max) {
-                    return Math.random() * (max - min) + min;
+            window.addEventListener('DOMContentLoaded', () => {
+                const container = document.getElementById('fxContainer');
+                if(!container) return;
+                
+                container.style.display = 'block';
+                const colors = ['#f59e0b', '#ef4444', '#10b981', '#3b82f6', '#ec4899', '#8b5cf6', '#eab308'];
+                
+                // Konfeti parçacıkları üret
+                for (let i = 0; i < 90; i++) {
+                    const piece = document.createElement('div');
+                    piece.className = 'confetti-piece';
+                    piece.style.left = Math.random() * 100 + 'vw';
+                    piece.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                    piece.style.animationDuration = (Math.random() * 1.0 + 1.0) + 's'; // 1 ile 2 saniye arası düşüş
+                    piece.style.animationDelay = (Math.random() * 0.5) + 's';
+                    piece.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+                    container.appendChild(piece);
                 }
 
-                var interval = setInterval(function() {
-                    var timeLeft = animationEnd - Date.now();
-
-                    if (timeLeft <= 0) {
-                        return clearInterval(interval);
-                    }
-
-                    var particleCount = 50 * (timeLeft / duration);
-                    
-                    // Ekranın hem solundan hem sağından havaya uçuşan havai fişek/konfetiler
-                    confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } }));
-                    confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
-                }, 250);
+                // Tam 2.2 saniye sonra hareketli konfetileri tamamen kaldır
+                setTimeout(() => {
+                    container.remove();
+                }, 2200);
             });
         </script>
         {% endif %}

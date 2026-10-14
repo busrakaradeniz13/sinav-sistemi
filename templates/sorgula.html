@@ -6,12 +6,13 @@
     <title>Öğrenci Sınav Sonuçları Sorgulama</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @keyframes pulse-grow {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.08); }
+        @keyframes popIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            70% { transform: scale(1.05); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
         }
-        .animate-pulse-grow {
-            animation: pulse-grow 1.5s infinite ease-in-out;
+        .animate-pop {
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
         #fireworksCanvas {
             position: fixed;
@@ -20,7 +21,7 @@
             width: 100vw;
             height: 100vh;
             pointer-events: none;
-            z-index: 9999;
+            z-index: 99999;
         }
     </style>
 </head>
@@ -64,24 +65,35 @@
         <!-- SONUÇ EKRANI -->
         {% if sonuc %}
 
-        <!-- İLK 3 DERECEDE ÇIKACAK TAM EKRAN KUTLAMA BANNERE -->
-        {% if en_iyi_derece %}
-        <div id="kutlamaOverlay" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4 transition-opacity duration-500">
-            <div class="bg-gradient-to-br from-amber-300 via-yellow-400 to-amber-500 text-slate-900 rounded-3xl p-8 max-w-md w-full shadow-2xl text-center space-y-5 border-4 border-white animate-pulse-grow">
-                <div class="inline-flex items-center justify-center w-28 h-28 bg-white rounded-full shadow-2xl text-6xl font-black text-amber-600 border-4 border-amber-200 mx-auto">
-                    {{ en_iyi_derece }}.
+        <!-- Python yerine HTML içinde doğrudan kontrol (Garantili Çalışır) -->
+        {% set ns = namespace(top_rank=none) %}
+        {% for sinav in sonuc.sinavlar %}
+            {% if sinav.derece %}
+                {% set temiz_derece = sinav.derece|string|replace('.', '')|trim %}
+                {% if temiz_derece in ['1', '2', '3'] and not ns.top_rank %}
+                    {% set ns.top_rank = temiz_derece %}
+                {% endif %}
+            {% endif %}
+        {% endfor %}
+
+        {% if ns.top_rank %}
+        <!-- TAM EKRAN DEV KUTLAMA MODALI -->
+        <div id="kutlamaOverlay" class="fixed inset-0 bg-slate-900/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+            <div class="bg-gradient-to-br from-amber-400 via-yellow-400 to-amber-500 text-slate-900 rounded-3xl p-8 max-w-md w-full shadow-2xl text-center space-y-5 border-4 border-white animate-pop">
+                <div class="inline-flex items-center justify-center w-32 h-32 bg-white rounded-full shadow-2xl text-6xl font-black text-amber-600 border-4 border-amber-200 mx-auto">
+                    {{ ns.top_rank }}.
                 </div>
-                <div class="space-y-2">
+                <div class="space-y-3">
                     <span class="bg-slate-900 text-amber-300 text-xs font-black uppercase px-4 py-1.5 rounded-full tracking-widest shadow-md inline-block">
                         🏆 SINIF DERECESİ
                     </span>
-                    <h2 class="text-3xl font-black text-slate-900 tracking-tight mt-2">TEBRİKLER!</h2>
-                    <p class="text-sm font-bold text-slate-900 leading-relaxed px-2 pt-2">
+                    <h2 class="text-3xl font-black text-slate-900 tracking-tight">MUHTEŞEM BAŞARI!</h2>
+                    <p class="text-sm font-bold text-slate-900 leading-relaxed px-2">
                         🎉 "Tebrikler! Sınıf içinde gösterdiğin bu üstün başarıdan dolayı seni kutluyorum."
                     </p>
                 </div>
                 <button onclick="kapatOverlay()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 rounded-2xl transition shadow-xl text-sm tracking-wide">
-                    Karneyi Göster 📜
+                    Karneyi İncele 👀
                 </button>
             </div>
         </div>
@@ -112,7 +124,8 @@
                     <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
                         
                         <!-- KART İÇİ TEBRİK MESAJI -->
-                        {% if sinav.derece and sinav.derece|string|replace('.', '')|trim in ['1', '2', '3'] %}
+                        {% set temiz_d = sinav.derece|string|replace('.', '')|trim if sinav.derece else '' %}
+                        {% if temiz_d in ['1', '2', '3'] %}
                         <div class="p-3 bg-gradient-to-r from-amber-500 to-yellow-500 text-white rounded-xl shadow-sm flex items-center gap-3">
                             <span class="text-2xl">🎉</span>
                             <div>
@@ -165,8 +178,8 @@
         © 2026 Büşra Güngör Öğrenci Sınav ve Karne Sistemi • Tüm hakları saklıdır.
     </footer>
 
-    <!-- HAVAİ FİŞEK KONTROL SCRIPTI (BAĞIMSIZ KOD) -->
-    {% if en_iyi_derece %}
+    <!-- SAF JS HAVAİ FİŞEK MOTORU -->
+    {% if ns.top_rank %}
     <script>
         function kapatOverlay() {
             const overlay = document.getElementById('kutlamaOverlay');
@@ -176,74 +189,72 @@
             }
         }
 
-        // 3 Saniye Sonra Otomatik Kapat
+        // 3.5 Saniye sonra otomatik kapat
         setTimeout(() => {
             kapatOverlay();
+        }, 3500);
+
+        // Havai Fişek Parçacık Sistemi
+        const canvas = document.getElementById('fireworksCanvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        function fireworkBurst() {
+            const x = Math.random() * canvas.width;
+            const y = Math.random() * (canvas.height * 0.6);
+            const colors = ['#f59e0b', '#ef4444', '#10b981', '#3b82f6', '#ec4899', '#ffffff'];
+            
+            for (let i = 0; i < 70; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 7 + 2;
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    alpha: 1,
+                    decay: Math.random() * 0.015 + 0.01,
+                    size: Math.random() * 4 + 2
+                });
+            }
+        }
+
+        let burstTimer = setInterval(fireworkBurst, 300);
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.04; // Yerçekimi
+                p.alpha -= p.decay;
+
+                if (p.alpha <= 0) {
+                    particles.splice(i, 1);
+                } else {
+                    ctx.globalAlpha = p.alpha;
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            requestAnimationFrame(animate);
+        }
+        animate();
+
+        setTimeout(() => {
+            clearInterval(burstTimer);
         }, 3200);
-
-        // SAF JAVASCRIPT HAVAİ FİŞEK MOTORU
-        (function() {
-            const canvas = document.getElementById('fireworksCanvas');
-            const ctx = canvas.getContext('2d');
-            let particles = [];
-
-            function resize() {
-                canvas.width = window.innerWidth;
-                canvas.height = window.innerHeight;
-            }
-            window.addEventListener('resize', resize);
-            resize();
-
-            function createFirework() {
-                const x = Math.random() * canvas.width;
-                const y = Math.random() * (canvas.height * 0.6);
-                const colors = ['#f59e0b', '#ef4444', '#10b981', '#3b82f6', '#ec4899', '#8b5cf6', '#ffffff'];
-                
-                for (let i = 0; i < 60; i++) {
-                    const angle = Math.random() * Math.PI * 2;
-                    const speed = Math.random() * 6 + 2;
-                    particles.push({
-                        x: x,
-                        y: y,
-                        vx: Math.cos(angle) * speed,
-                        vy: Math.sin(angle) * speed,
-                        color: colors[Math.floor(Math.random() * colors.length)],
-                        alpha: 1,
-                        decay: Math.random() * 0.02 + 0.015,
-                        size: Math.random() * 4 + 2
-                    });
-                }
-            }
-
-            let fireworkInterval = setInterval(createFirework, 250);
-
-            function loop() {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                for (let i = particles.length - 1; i >= 0; i--) {
-                    let p = particles[i];
-                    p.x += p.vx;
-                    p.y += p.vy;
-                    p.vy += 0.05; // yerçekimi
-                    p.alpha -= p.decay;
-
-                    if (p.alpha <= 0) {
-                        particles.splice(i, 1);
-                    } else {
-                        ctx.globalAlpha = p.alpha;
-                        ctx.fillStyle = p.color;
-                        ctx.beginPath();
-                        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-                        ctx.fill();
-                    }
-                }
-                requestAnimationFrame(loop);
-            }
-            loop();
-
-            setTimeout(() => {
-                clearInterval(fireworkInterval);
-            }, 3000);
-        })();
     </script>
     {% endif %}
 

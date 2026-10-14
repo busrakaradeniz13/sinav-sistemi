@@ -181,14 +181,23 @@ def admin_panel():
     else:
       flash("Hatalı şifre!", "error")
       return render_template(
-          "admin.html", veriler=sinav_verileri, giris_yapildi=False
+          "admin.html",
+          veriler=sinav_verileri,
+          giris_yapildi=False,
+          son_sinav="",
       )
   if not session.get("admin_logged_in"):
     return render_template(
-        "admin.html", veriler=sinav_verileri, giris_yapildi=False
+        "admin.html", veriler=sinav_verileri, giris_yapildi=False, son_sinav=""
     )
+
+  # Oturumda hafızada tutulan son sınav adını şablona gönderiyoruz
+  son_sinav = session.get("son_sinav_adi", "")
   return render_template(
-      "admin.html", veriler=sinav_verileri, giris_yapildi=True
+      "admin.html",
+      veriler=sinav_verileri,
+      giris_yapildi=True,
+      son_sinav=son_sinav,
   )
 
 
@@ -207,6 +216,10 @@ def ogrenci_kaydet():
   ad = request.form.get("ad", "").strip()
   sinav_adi = request.form.get("sinav", "Genel Sınav").strip()
   derece = request.form.get("derece", "").strip()
+
+  # En son girilen sınav adını hafızada sakla
+  if sinav_adi:
+    session["son_sinav_adi"] = sinav_adi
 
   try:
     dogru = int(request.form.get("dogru", 0))

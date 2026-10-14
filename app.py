@@ -3,7 +3,6 @@ import os
 from flask import (
     Flask,
     flash,
-    jsonify,
     redirect,
     render_template,
     request,
@@ -180,16 +179,14 @@ def admin_panel():
     if sifre == ADMIN_PASSWORD:
       session["admin_logged_in"] = True
     else:
-      flash("Hatalı yönetici şifresi!", "error")
+      flash("Hatalı şifre!", "error")
       return render_template(
           "admin.html", veriler=sinav_verileri, giris_yapildi=False
       )
-
   if not session.get("admin_logged_in"):
     return render_template(
         "admin.html", veriler=sinav_verileri, giris_yapildi=False
     )
-
   return render_template(
       "admin.html", veriler=sinav_verileri, giris_yapildi=True
   )
@@ -197,7 +194,7 @@ def admin_panel():
 
 @app.route("/admin/cikis")
 def admin_cikis():
-  session.pop("admin_logged_in", None)
+  session.clear()
   return redirect(url_for("admin_panel"))
 
 
@@ -208,7 +205,7 @@ def ogrenci_kaydet():
 
   ogrenci_no = request.form.get("ogrenci_no", "").strip()
   ad = request.form.get("ad", "").strip()
-  sinav_adi = request.form.get("sinav", "").strip()
+  sinav_adi = request.form.get("sinav", "Genel Sınav").strip()
   derece = request.form.get("derece", "").strip()
 
   try:
@@ -219,24 +216,22 @@ def ogrenci_kaydet():
   except ValueError:
     dogru, yanlis, bos, puan = 0, 0, 0, 0
 
-  if ogrenci_no and ad and sinav_adi:
+  yeni_sinav = {
+      "sinav": sinav_adi,
+      "dogru": dogru,
+      "yanlis": yanlis,
+      "bos": bos,
+      "puan": puan,
+      "derece": derece,
+  }
+
+  if ogrenci_no and ad:
     if ogrenci_no not in sinav_verileri:
       sinav_verileri[ogrenci_no] = {"ad": ad, "sinavlar": []}
-
-    # İsim güncellendiyse yansıt
     sinav_verileri[ogrenci_no]["ad"] = ad
     mevcut = sinav_verileri[ogrenci_no]["sinavlar"]
-
-    yeni_sinav = {
-        "sinav": sinav_adi,
-        "dogru": dogru,
-        "yanlis": yanlis,
-        "bos": bos,
-        "puan": puan,
-        "derece": derece,
-    }
-
     guncellendi = False
+
     for s in mevcut:
       if s["sinav"].lower() == sinav_adi.lower():
         s.update(yeni_sinav)
@@ -246,20 +241,9 @@ def ogrenci_kaydet():
       mevcut.append(yeni_sinav)
 
     verileri_excele_yedekle()
-    flash(f"Başarılı: {ad} ({sinav_adi}) kaydedildi.", "success")
-  else:
-    flash("Öğrenci no, adı ve sınav adı boş bırakılamaz!", "error")
+    flash(f"Başarılı: {ad} - {sinav_adi} kaydedildi.", "success")
 
   return redirect(url_for("admin_panel"))
-
-
-@app.route("/admin/ogrenci-ara/<ogrenci_no>")
-def ogrenci_ara(ogrenci_no):
-  if not session.get("admin_logged_in"):
-    return jsonify({"bulundu": False})
-  if ogrenci_no in sinav_verileri:
-    return jsonify({"bulundu": True, "ad": sinav_verileri[ogrenci_no]["ad"]})
-  return jsonify({"bulundu": False})
 
 
 @app.route("/admin/ogrenci-sil/<ogrenci_no>")
@@ -269,7 +253,7 @@ def ogrenci_sil(ogrenci_no):
   if ogrenci_no in sinav_verileri:
     del sinav_verileri[ogrenci_no]
     verileri_excele_yedekle()
-    flash("Öğrenci sistemden silindi.", "info")
+    flash("Öğrenci silindi.", "info")
   return redirect(url_for("admin_panel"))
 
 
@@ -341,7 +325,7 @@ def excel_indir():
         ),
     )
   except Exception as e:
-    flash(f"İndirme sırasında hata: {str(e)}", "error")
+    flash(f"İndirme sırasında bir hata oluştu: {str(e)}", "error")
     return redirect(url_for("admin_panel"))
 
 

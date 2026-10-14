@@ -11,13 +11,12 @@ from flask import (
 import pandas as pd
 
 app = Flask(__name__)
-# Bulut sunucularda oturumun kopmaması için sabit ve güvenli bir gizli anahtar
 app.secret_key = "ogretmen_cok_gizli_guvenlik_anahtari_98765"
 
 # ÖĞRETMEN GİRİŞ ŞİFRESİ
 ADMIN_PASSWORD = "1234"
 
-# Örnek başlangıç verileri
+# Örnek başlangıç verileri (Bellek üstünde tutulan veri tabanı)
 sinav_verileri = {
     "101": {
         "ad": "Ahmet Yılmaz",
@@ -38,53 +37,73 @@ sinav_verileri = {
 }
 
 
+# ==========================================
+# 1. VELİ SORGULAMA BÖLÜMÜ (Sadece Ana Sayfa)
+# ==========================================
 @app.route("/", methods=["GET", "POST"])
-def index():
+def veli_sorgula():
   sonuc = None
   hata = None
+
   if request.method == "POST":
     ogrenci_no = request.form.get("ogrenci_no", "").strip()
+
     if not ogrenci_no:
       hata = "Lütfen geçerli bir öğrenci numarası giriniz."
     elif ogrenci_no in sinav_verileri:
       sonuc = sinav_verileri[ogrenci_no]
     else:
-      hata = "Bu numaraya ait sınav sonucu bulunamadı."
+      hata = (
+          "Bu numaraya ait sınav sonucu bulunamadı. Lütfen numarayı kontrol"
+          " ediniz."
+      )
+
   return render_template("sorgula.html", sonuc=sonuc, hata=hata)
 
 
-@app.route("/login", methods=["GET", "POST"])
-def login():
+# ==========================================
+# 2. ÖĞRETMEN GİRİŞ VE YÖNETİM BÖLÜMÜ
+# ==========================================
+@app.route("/ogretmen-giris", methods=["GET", "POST"])
+def ogretmen_giris():
+  # Zaten giriş yapmışsa doğrudan panele yolla
+  if session.get("admin_logged_in"):
+    return redirect(url_for("ogretmen_panel"))
+
   if request.method == "POST":
     sifre = request.form.get("sifre", "").strip()
     if sifre == ADMIN_PASSWORD:
       session["admin_logged_in"] = True
-      return redirect(url_for("admin_panel"))
+      return redirect(url_for("ogretmen_panel"))
     else:
-      flash("Hatalı şifre!", "error")
+      flash("Hatalı şifre! Lütfen tekrar deneyin.", "error")
+
   return render_template("login.html")
 
 
-@app.route("/logout")
-def logout():
+@app.route("/ogretmen-cikis")
+def ogretmen_cikis():
   session.clear()
-  return redirect(url_for("login"))
+  return redirect(url_for("ogretmen_giris"))
 
 
-@app.route("/admin", methods=["GET"])
-def admin_panel():
+@app.route("/yonetim-paneli", methods=["GET"])
+def ogretmen_panel():
+  # Güvenlik kontrolü: Giriş yapmamışsa login sayfasına at
   if not session.get("admin_logged_in"):
-    return redirect(url_for("login"))
+    return redirect(url_for("ogretmen_giris"))
+
   return render_template("admin.html", veriler=sinav_verileri)
 
 
-@app.route("/admin/kaydet", methods=["POST"])
+@app.route("/yonetim-paneli/kaydet", methods=["POST"])
 def ogrenci_kaydet():
   if not session.get("admin_logged_in"):
-    return redirect(url_for("login"))
+    return redirect(url_for("ogretmen_giris"))
 
   ogrenci_no = request.form.get("ogrenci_no", "").strip()
   ad = request.form.get("ad", "").strip()
+
   if ogrenci_no and ad:
     sinav_verileri[ogrenci_no] = {
         "ad": ad,
@@ -94,25 +113,27 @@ def ogrenci_kaydet():
         "bos": int(request.form.get("bos", 0)),
         "puan": int(request.form.get("puan", 0)),
     }
-    flash("Başarıyla kaydedildi!", "success")
-  return redirect(url_for("admin_panel"))
+    flash("Öğrenci notu başarıyla kaydedildi!", "success")
+
+  return redirect(url_for("ogretmen_panel"))
 
 
-@app.route("/admin/sil/<ogrenci_no>")
+@app.route("/yonetim-paneli/sil/<ogrenci_no>")
 def ogrenci_sil(ogrenci_no):
   if not session.get("admin_logged_in"):
-    return redirect(url_for("login"))
+    return redirect(url_for("ogretmen_giris"))
 
   if ogrenci_no in sinav_verileri:
     del sinav_verileri[ogrenci_no]
-    flash("Kayıt silindi.", "info")
-  return redirect(url_for("admin_panel"))
+    flash("Öğrenci kaydı silindi.", "info")
+
+  return redirect(url_for("ogretmen_panel"))
 
 
-@app.route("/admin/excel-yukle", methods=["POST"])
+@app.route("/yonetim-paneli/excel-yukle", methods=["POST"])
 def excel_yukle():
   if not session.get("admin_logged_in"):
-    return redirect(url_for("login"))
+    return redirect(url_for("ogretmen_giris"))
 
   dosya = request.files.get("excel_dosya")
   if dosya:
@@ -121,6 +142,7 @@ def excel_yukle():
         df = pd.read_csv(dosya)
       else:
         df = pd.read_excel(dosya)
+
       for _, row in df.iterrows():
         no = str(row["ogrenci_no"]).strip()
         sinav_verileri[no] = {
@@ -131,10 +153,11 @@ def excel_yukle():
             "bos": int(row.get("bos", 0)),
             "puan": int(row.get("puan", 0)),
         }
-      flash("Excel başarıyla yüklendi!", "success")
+      flash("Excel başarıyla yüklendi ve notlar güncellendi!", "success")
     except Exception as e:
-      flash(f"Hata: {str(e)}", "error")
-  return redirect(url_for("admin_panel"))
+      flash(f"Excel okunurken hata oluştu: {str(e)}", "error")
+
+  return redirect(url_for("ogretmen_panel"))
 
 
 if __name__ == "__main__":

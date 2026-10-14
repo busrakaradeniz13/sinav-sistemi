@@ -18,7 +18,7 @@ app.secret_key = "ogretmen_cok_gizli_guvenlik_anahtari_98765"
 ADMIN_PASSWORD = "1234"
 YEDEK_DOSYA_YOLU = "notlar_yedek.xlsx"
 
-# Varsayılan başlangıç verileri
+# Varsayılan başlangıç verileri (derece desteği eklendi)
 sinav_verileri = {
     "101": {
         "ad": "Ahmet Yılmaz",
@@ -29,6 +29,7 @@ sinav_verileri = {
                 "yanlis": 2,
                 "bos": 0,
                 "puan": 90,
+                "derece": "1",
             },
             {
                 "sinav": "Türkçe 1. Yazılı",
@@ -36,6 +37,7 @@ sinav_verileri = {
                 "yanlis": 5,
                 "bos": 0,
                 "puan": 75,
+                "derece": "",
             },
         ],
     },
@@ -47,6 +49,7 @@ sinav_verileri = {
             "yanlis": 0,
             "bos": 0,
             "puan": 100,
+            "derece": "2",
         }],
     },
 }
@@ -91,8 +94,15 @@ def yedekten_verileri_yukle():
               if pd.notna(row.get("puan", row.get("not", 0)))
               else 0
           )
+          derece = str(
+              row.get("derece", row.get("siralama", ""))
+              if pd.notna(row.get("derece", row.get("siralama", "")))
+              else ""
+          ).strip()
+          if derece == "nan":
+            derece = ""
         except:
-          dogru, yanlis, bos, puan = 0, 0, 0, 0
+          dogru, yanlis, bos, puan, derece = 0, 0, 0, 0, ""
 
         yeni_sinav = {
             "sinav": sinav_adi,
@@ -100,6 +110,7 @@ def yedekten_verileri_yukle():
             "yanlis": yanlis,
             "bos": bos,
             "puan": puan,
+            "derece": derece,
         }
 
         if no and no != "nan":
@@ -141,6 +152,7 @@ def verileri_excele_yedekle():
             "yanlis": s["yanlis"],
             "bos": s["bos"],
             "puan": s["puan"],
+            "derece": s.get("derece", ""),
         })
     if satirlar:
       df = pd.DataFrame(satirlar)
@@ -193,9 +205,12 @@ def admin_cikis():
 def ogrenci_kaydet():
   if not session.get("admin_logged_in"):
     return redirect(url_for("admin_panel"))
+
   ogrenci_no = request.form.get("ogrenci_no", "").strip()
   ad = request.form.get("ad", "").strip()
   sinav_adi = request.form.get("sinav", "Genel Sınav").strip()
+  derece = request.form.get("derece", "").strip()
+
   try:
     dogru = int(request.form.get("dogru", 0))
     yanlis = int(request.form.get("yanlis", 0))
@@ -210,14 +225,16 @@ def ogrenci_kaydet():
       "yanlis": yanlis,
       "bos": bos,
       "puan": puan,
+      "derece": derece,
   }
+
   if ogrenci_no and ad:
     if ogrenci_no not in sinav_verileri:
       sinav_verileri[ogrenci_no] = {"ad": ad, "sinavlar": []}
-    sinav_verileri[no]["ad"] if "no" in locals() else None  # safe check
     sinav_verileri[ogrenci_no]["ad"] = ad
     mevcut = sinav_verileri[ogrenci_no]["sinavlar"]
     guncellendi = False
+
     for s in mevcut:
       if s["sinav"].lower() == sinav_adi.lower():
         s.update(yeni_sinav)
@@ -275,7 +292,7 @@ def excel_yukle():
   return redirect(url_for("admin_panel"))
 
 
-# --- HAFIZADAN DOĞRUDAN EXCEL OLUŞTURUP İNDİRME (HATASIZ YÖNTEM) ---
+# --- HAFIZADAN DOĞRUDAN ÖZEL İSİMLİ EXCEL OLUŞTURUP İNDİRME ---
 @app.route("/admin/excel-indir")
 def excel_indir():
   if not session.get("admin_logged_in"):
@@ -294,11 +311,12 @@ def excel_indir():
             "yanlis": s["yanlis"],
             "bos": s["bos"],
             "puan": s["puan"],
+            "derece": s.get("derece", ""),
         })
 
     df = pd.DataFrame(satirlar)
 
-    # Dosyayı fiziksel olarak kaydetmek yerine doğrudan RAM'de (bellekte) Excel baytlarına çeviriyoruz
+    # Dosyayı sunucu diskine kaydetmek yerine RAM'de (bellekte) Excel baytlarına dönüştürüyoruz
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
       df.to_excel(writer, index=False)

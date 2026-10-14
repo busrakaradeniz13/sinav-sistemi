@@ -3,79 +3,125 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Öğrenci Sınav Sonuç Karnesi</title>
+    <title>Öğrenci Sınav Sonuçları Sorgulama</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-slate-100 min-h-screen flex flex-col items-center justify-center p-4">
+<body class="bg-slate-50 min-h-screen flex flex-col justify-between font-sans">
 
-    <div class="w-full max-w-lg bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
-        <!-- Başlık Kısmı -->
-        <div class="bg-indigo-600 p-6 text-center text-white">
-            <h1 class="text-xl font-bold tracking-wide">Öğrenci Sınav Karnesi</h1>
-            <p class="text-xs text-indigo-200 mt-1">Numaranızı girerek tüm sınav sonuçlarınızı inceleyin.</p>
-        </div>
+    <!-- ÜST KISIM / BAŞLIK -->
+    <header class="bg-indigo-600 text-white py-6 px-4 shadow-md text-center">
+        <h1 class="text-xl md:text-2xl font-bold tracking-tight">Büşra Güngör Öğrenci Sınav Sonuçları</h1>
+        <p class="text-xs text-indigo-200 mt-1">Öğrenci numaranızı girerek tüm sınav geçmişinizi ve karnenizi inceleyebilirsiniz.</p>
+    </header>
 
-        <!-- Form Kısmı -->
-        <div class="p-6">
+    <!-- ANA İÇERİK -->
+    <main class="max-w-2xl w-full mx-auto p-4 md:p-6 my-auto space-y-6">
+
+        <!-- SORGULAMA FORMU -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
             <form method="POST" class="space-y-4">
                 <div>
-                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-2">Öğrenci Numarası</label>
-                    <input type="text" name="ogrenci_no" placeholder="Örn: 101" required
-                        class="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-center font-bold text-lg text-slate-700 tracking-wider">
+                    <label class="block text-xs font-bold text-slate-600 uppercase mb-2">Öğrenci Numarası</label>
+                    <div class="flex gap-2">
+                        <input type="text" name="ogrenci_no" placeholder="Örn: 101" required autofocus
+                            class="flex-1 px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-base text-slate-800">
+                        <button type="submit" 
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-3 rounded-xl transition duration-200 shadow-md text-sm">
+                            Sorgula 🔍
+                        </button>
+                    </div>
                 </div>
-                <button type="submit" 
-                    class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-xl transition duration-200 shadow-md">
-                    Sonuçları Sorgula
-                </button>
             </form>
 
-            <!-- Sonuç Gösterim Alanı (Tüm Sınavlar Listelenir) -->
-            {% if sonuc %}
-            <div class="mt-6 space-y-4">
-                <div class="text-center pb-2 border-b border-slate-200">
-                    <h2 class="text-xl font-bold text-slate-800">{{ sonuc.ad }}</h2>
-                    <span class="text-xs text-slate-400 font-medium">Öğrencinin Tüm Sınav Sonuçları</span>
-                </div>
-
-                <!-- Döngü ile her sınav ayrı bir kart olarak listelenir -->
-                {% for sinav in sonuc.sinavlar %}
-                <div class="p-4 bg-slate-50 border border-emerald-200 rounded-xl shadow-sm">
-                    <div class="flex justify-between items-center pb-2 border-b border-slate-200">
-                        <span class="text-sm font-bold text-emerald-800">{{ sinav.sinav }}</span>
-                        <span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold">Puan: {{ sinav.puan }}</span>
-                    </div>
-                    <div class="grid grid-cols-3 gap-2 mt-3 text-center">
-                        <div class="bg-white p-2 rounded-lg border border-slate-100 shadow-sm">
-                            <span class="block text-[10px] text-slate-400 font-medium uppercase">Doğru</span>
-                            <span class="text-sm font-bold text-emerald-600">{{ sinav.dogru }}</span>
-                        </div>
-                        <div class="bg-white p-2 rounded-lg border border-slate-100 shadow-sm">
-                            <span class="block text-[10px] text-slate-400 font-medium uppercase">Yanlış</span>
-                            <span class="text-sm font-bold text-rose-600">{{ sinav.yanlis }}</span>
-                        </div>
-                        <div class="bg-white p-2 rounded-lg border border-slate-100 shadow-sm">
-                            <span class="block text-[10px] text-slate-400 font-medium uppercase">Boş</span>
-                            <span class="text-sm font-bold text-slate-500">{{ sinav.bos }}</span>
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-            {% endif %}
-
-            <!-- Hata Mesajı -->
             {% if hata %}
-            <div class="mt-6 p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-sm text-center font-medium">
+            <div class="mt-4 p-4 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold rounded-xl text-center">
                 {{ hata }}
             </div>
             {% endif %}
         </div>
-        
-        <!-- Alt Bilgi -->
-        <div class="bg-slate-50 px-6 py-3 text-center border-t border-slate-100 text-xs text-slate-400">
-            Gizliliğiniz güvence altındadır. Sadece kendi çocuğunuzun sonuçlarını görürsünüz.
+
+        <!-- SONUÇ EKRANI (KARNE GÖRÜNÜMÜ) -->
+        {% if sonuc %}
+        <div class="bg-white p-6 md:p-8 rounded-2xl shadow-md border border-slate-200 space-y-6">
+            
+            <!-- ÖĞRENCİ KİMLİK BİLGİSİ -->
+            <div class="flex justify-between items-center border-b pb-4">
+                <div>
+                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Öğrenci Adı Soyadı</span>
+                    <h2 class="text-xl font-extrabold text-slate-800 mt-0.5">{{ sonuc.ad }}</h2>
+                </div>
+                <div class="text-right">
+                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Okul Numarası</span>
+                    <div class="text-sm font-bold bg-indigo-50 text-indigo-700 px-3 py-1 rounded-xl mt-0.5 inline-block border border-indigo-100">
+                        No: {{ request.form.get('ogrenci_no') }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- SINAV GEÇMİŞİ VE DERECELER -->
+            <div class="space-y-4">
+                <h3 class="text-sm font-bold text-slate-700">Sınav Sonuçları ve Karne Geçmişi</h3>
+                
+                <div class="space-y-3">
+                    {% for sinav in sonuc.sinavlar %}
+                    <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3 hover:border-indigo-200 transition">
+                        
+                        <!-- İLK 3 İÇİN ÖZEL KUTLAMA MESAJI -->
+                        {% if sinav.derece and (sinav.derece|lower in ['1', '2', '3', '1.', '2.', '3.']) %}
+                        <div class="p-3 bg-gradient-to-r from-amber-500 to-yellow-500 text-white rounded-xl shadow-sm flex items-center gap-3">
+                            <span class="text-2xl">🎉</span>
+                            <div>
+                                <h4 class="text-xs font-extrabold uppercase tracking-wide">Tebrikler!</h4>
+                                <p class="text-[12px] text-amber-50 font-semibold mt-0.5">Tebrikler! Sınıf içinde gösterdiğin bu üstün başarıdan dolayı seni kutluyorum.</p>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <div class="flex justify-between items-center">
+                            <span class="font-bold text-slate-800 text-sm">{{ sinav.sinav }}</span>
+                            
+                            <!-- Derece Rozeti -->
+                            {% if sinav.derece %}
+                            <span class="bg-amber-100 text-amber-800 text-xs font-extrabold px-3 py-1 rounded-xl border border-amber-200 flex items-center gap-1 shadow-xs">
+                                🏆 Sınıf Derecesi: {{ sinav.derece }}
+                            </span>
+                            {% endif %}
+                        </div>
+
+                        <!-- NET VE PUAN DETAYLARI -->
+                        <div class="grid grid-cols-4 gap-2 text-center pt-2 border-t border-slate-200/60">
+                            <div class="bg-white p-2 rounded-lg border border-slate-200">
+                                <span class="block text-[10px] text-slate-400 font-semibold uppercase">Doğru</span>
+                                <span class="text-sm font-bold text-emerald-600">{{ sinav.dogru }}</span>
+                            </div>
+                            <div class="bg-white p-2 rounded-lg border border-slate-200">
+                                <span class="block text-[10px] text-slate-400 font-semibold uppercase">Yanlış</span>
+                                <span class="text-sm font-bold text-rose-600">{{ sinav.yanlis }}</span>
+                            </div>
+                            <div class="bg-white p-2 rounded-lg border border-slate-200">
+                                <span class="block text-[10px] text-slate-400 font-semibold uppercase">Boş</span>
+                                <span class="text-sm font-bold text-slate-500">{{ sinav.bos }}</span>
+                            </div>
+                            <div class="bg-indigo-50 p-2 rounded-lg border border-indigo-100">
+                                <span class="block text-[10px] text-indigo-400 font-semibold uppercase">Puan</span>
+                                <span class="text-base font-extrabold text-indigo-700">{{ sinav.puan }}</span>
+                            </div>
+                        </div>
+
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
         </div>
-    </div>
+        {% endif %}
+
+    </main>
+
+    <!-- ALT BİLGİ -->
+    <footer class="text-center py-4 text-xs text-slate-400 border-t border-slate-200 mt-8">
+        © 2026 Büşra Güngör Öğrenci Sınav ve Karne Sistemi • Tüm hakları saklıdır.
+    </footer>
 
 </body>
 </html>

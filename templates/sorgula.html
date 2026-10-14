@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Öğrenci Sınav Sonuç Ekranı</title>
+    <title>Öğrenci Sınav Sonuç Karnesi</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-100 min-h-screen flex flex-col items-center justify-center p-4">
 
-    <div class="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
+    <div class="w-full max-w-lg bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
         <!-- Başlık Kısmı -->
         <div class="bg-indigo-600 p-6 text-center text-white">
-            <h1 class="text-xl font-bold tracking-wide">Sınav Sonuç Sistemi</h1>
-            <p class="text-xs text-indigo-200 mt-1">Öğrenci numaranızla sonucunuzu güvenle sorgulayın.</p>
+            <h1 class="text-xl font-bold tracking-wide">Öğrenci Sınav Karnesi</h1>
+            <p class="text-xs text-indigo-200 mt-1">Numaranızı girerek tüm sınav sonuçlarınızı inceleyin.</p>
         </div>
 
         <!-- Form Kısmı -->
@@ -25,35 +25,45 @@
                 </div>
                 <button type="submit" 
                     class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-xl transition duration-200 shadow-md">
-                    Sonucu Sorgula
+                    Sonuçları Sorgula
                 </button>
             </form>
 
-            <!-- Sonuç Gösterim Alanı (Flask 'sonuc' değişkenini yakalar) -->
+            <!-- Sonuç Gösterim Alanı (Tüm Sınavlar Listelenir) -->
             {% if sonuc %}
-            <div class="mt-6 p-5 bg-emerald-50 border border-emerald-200 rounded-xl">
-                <div class="text-center pb-3 border-b border-emerald-200">
-                    <span class="text-xs text-emerald-600 font-bold uppercase tracking-wider">{{ sonuc.sinav }}</span>
-                    <h2 class="text-lg font-bold text-emerald-900 mt-1">{{ sonuc.ad }}</h2>
+            <div class="mt-6 space-y-4">
+                <div class="text-center pb-2 border-b border-slate-200">
+                    <h2 class="text-xl font-bold text-slate-800">{{ sonuc.ad }}</h2>
+                    <span class="text-xs text-slate-400 font-medium">Öğrencinin Tüm Sınav Sonuçları</span>
                 </div>
-                <div class="grid grid-cols-3 gap-2 mt-4 text-center">
-                    <div class="bg-white p-2.5 rounded-lg border border-emerald-100 shadow-sm">
-                        <span class="block text-xs text-slate-400 font-medium">Doğru</span>
-                        <span class="text-base font-bold text-emerald-600">{{ sonuc.dogru }}</span>
+
+                <!-- Döngü ile her sınav ayrı bir kart olarak listelenir -->
+                {% for sinav in sonuc.sinavlar %}
+                <div class="p-4 bg-slate-50 border border-emerald-200 rounded-xl shadow-sm">
+                    <div class="flex justify-between items-center pb-2 border-b border-slate-200">
+                        <span class="text-sm font-bold text-emerald-800">{{ sinav.sinav }}</span>
+                        <span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold">Puan: {{ sinav.puan }}</span>
                     </div>
-                    <div class="bg-white p-2.5 rounded-lg border border-emerald-100 shadow-sm">
-                        <span class="block text-xs text-slate-400 font-medium">Yanlış</span>
-                        <span class="text-base font-bold text-rose-600">{{ sonuc.yanlis }}</span>
-                    </div>
-                    <div class="bg-white p-2.5 rounded-lg border border-emerald-100 shadow-sm">
-                        <span class="block text-xs text-slate-400 font-medium">Puan</span>
-                        <span class="text-base font-bold text-indigo-600">{{ sonuc.puan }}</span>
+                    <div class="grid grid-cols-3 gap-2 mt-3 text-center">
+                        <div class="bg-white p-2 rounded-lg border border-slate-100 shadow-sm">
+                            <span class="block text-[10px] text-slate-400 font-medium uppercase">Doğru</span>
+                            <span class="text-sm font-bold text-emerald-600">{{ sinav.dogru }}</span>
+                        </div>
+                        <div class="bg-white p-2 rounded-lg border border-slate-100 shadow-sm">
+                            <span class="block text-[10px] text-slate-400 font-medium uppercase">Yanlış</span>
+                            <span class="text-sm font-bold text-rose-600">{{ sinav.yanlis }}</span>
+                        </div>
+                        <div class="bg-white p-2 rounded-lg border border-slate-100 shadow-sm">
+                            <span class="block text-[10px] text-slate-400 font-medium uppercase">Boş</span>
+                            <span class="text-sm font-bold text-slate-500">{{ sinav.bos }}</span>
+                        </div>
                     </div>
                 </div>
+                {% endfor %}
             </div>
             {% endif %}
 
-            <!-- Hata Mesajı (Flask 'hata' değişkenini yakalar) -->
+            <!-- Hata Mesajı -->
             {% if hata %}
             <div class="mt-6 p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-sm text-center font-medium">
                 {{ hata }}
@@ -63,7 +73,7 @@
         
         <!-- Alt Bilgi -->
         <div class="bg-slate-50 px-6 py-3 text-center border-t border-slate-100 text-xs text-slate-400">
-            Gizliliğiniz güvence altındadır. Sadece kendi çocuğunuzun sonucunu görürsünüz.
+            Gizliliğiniz güvence altındadır. Sadece kendi çocuğunuzun sonuçlarını görürsünüz.
         </div>
     </div>
 

@@ -203,10 +203,11 @@ def admin_panel():
 
 @app.route("/admin/ogrenci-ara/<ogrenci_no>")
 def ogrenci_ara(ogrenci_no):
-  if not session.get("admin_logged_in"):
-    return jsonify({"bulundu": False})
-  if ogrenci_no in sinav_verileri:
-    return jsonify({"bulundu": True, "ad": sinav_verileri[ogrenci_no]["ad"]})
+  ogrenci_no_str = str(ogrenci_no).strip()
+  if ogrenci_no_str in sinav_verileri:
+    return jsonify(
+        {"bulundu": True, "ad": sinav_verileri[ogrenci_no_str]["ad"]}
+    )
   return jsonify({"bulundu": False})
 
 

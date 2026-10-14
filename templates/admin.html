@@ -9,12 +9,12 @@
 <body class="bg-slate-100 min-h-screen text-slate-800 font-sans">
 
     {% if not giris_yapildi %}
-    <!-- GÜVENLİ ŞİFRE GİRİŞ EKRANI -->
+    <!-- ŞİFRE GİRİŞ EKRANI -->
     <div class="min-h-screen flex items-center justify-center p-4">
         <div class="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full border border-slate-200">
             <div class="text-center mb-6">
                 <h1 class="text-2xl font-bold text-slate-800">Öğretmen Girişi</h1>
-                <p class="text-xs text-slate-500 mt-1">Büşra Güngör Sınav ve Karne Yönetim Paneli</p>
+                <p class="text-xs text-slate-500 mt-1">Sınav ve öğrenci yönetim paneline hoş geldiniz</p>
             </div>
 
             {% with messages = get_flashed_messages(with_categories=true) %}
@@ -30,7 +30,7 @@
             <form method="POST" action="/admin" class="space-y-4">
                 <div>
                     <label class="block text-xs font-bold text-slate-600 uppercase mb-2">Yönetici Şifresi</label>
-                    <input type="password" name="sifre" required placeholder="Şifrenizi giriniz (1234)" autofocus
+                    <input type="password" name="sifre" required placeholder="Şifrenizi giriniz" autofocus
                         class="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-bold">
                 </div>
                 <button type="submit" 
@@ -42,19 +42,19 @@
     </div>
 
     {% else %}
-    <!-- YÖNETİM PANELİ (HİBRİT & FONKSİYONEL) -->
+    <!-- YÖNETİM PANELİ -->
     <header class="bg-slate-900 text-white py-4 px-6 shadow-md flex justify-between items-center">
         <div>
-            <h1 class="text-base md:text-lg font-bold">Büşra Güngör • Yönetim Paneli</h1>
-            <p class="text-xs text-slate-400">Sınav Geçmişi ve Not Yönetimi</p>
+            <h1 class="text-lg font-bold">Büşra Güngör • Öğretmen Paneli</h1>
+            <p class="text-xs text-slate-400">Sınav Notları ve Derece Yönetimi</p>
         </div>
         <div class="flex items-center gap-3">
             <a href="/admin/excel-indir" 
-                class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl text-xs font-bold transition shadow flex items-center gap-1.5">
+                class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow">
                 📊 Excel İndir
             </a>
             <a href="/admin/cikis" 
-                class="bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 rounded-xl text-xs font-bold transition">
+                class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition">
                 Çıkış Yap 🔒
             </a>
         </div>
@@ -74,32 +74,26 @@
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
-            <!-- SOL KOLON: HIZLI NOT / DERECE EKLEME FORMU -->
+            <!-- FORM: NOT / DERECE EKLE -->
             <div class="lg:col-span-1 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4 h-fit">
-                <div class="border-b pb-3">
-                    <h2 class="text-base font-bold text-slate-800">Sınav Sonucu Ekle / Güncelle</h2>
-                    <p class="text-[11px] text-slate-500 mt-0.5">Var olan no yazıldığında isim otomatik gelir.</p>
-                </div>
+                <h2 class="text-base font-bold text-slate-800 border-b pb-3">Öğrenci Sınav Sonucu Ekle</h2>
                 
                 <form method="POST" action="/admin/kaydet" class="space-y-3">
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 mb-1">Öğrenci Numarası</label>
-                        <input type="text" id="ogrenci_no_input" name="ogrenci_no" required placeholder="Örn: 101"
+                        <input type="text" name="ogrenci_no" required placeholder="Örn: 101"
                             class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 text-sm font-bold">
                     </div>
 
                     <div>
-                        <div class="flex justify-between items-center mb-1">
-                            <label class="block text-xs font-semibold text-slate-600">Öğrenci Adı Soyadı</label>
-                            <span id="otomatik_bilgi" class="text-[10px] text-emerald-600 font-bold hidden">✓ Otomatik yüklendi</span>
-                        </div>
-                        <input type="text" id="ad_input" name="ad" required placeholder="Örn: Ahmet Yılmaz"
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Öğrenci Adı Soyadı</label>
+                        <input type="text" name="ad" required placeholder="Örn: Ahmet Yılmaz"
                             class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 text-sm">
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Ders / Sınav Adı</label>
-                        <input type="text" name="sinav" required placeholder="Örn: Matematik 1. Yazılı"
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Sınav Adı</label>
+                        <input type="text" name="sinav" required placeholder="Örn: Matematik 2. Yazılı"
                             class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 text-sm">
                     </div>
 
@@ -107,17 +101,17 @@
                         <div>
                             <label class="block text-xs font-semibold text-slate-600 mb-1">Doğru</label>
                             <input type="number" name="dogru" value="0" min="0"
-                                class="w-full px-2 py-2 rounded-lg border border-slate-300 text-sm text-center font-bold text-emerald-600">
+                                class="w-full px-2 py-2 rounded-lg border border-slate-300 text-sm text-center">
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-600 mb-1">Yanlış</label>
                             <input type="number" name="yanlis" value="0" min="0"
-                                class="w-full px-2 py-2 rounded-lg border border-slate-300 text-sm text-center font-bold text-rose-600">
+                                class="w-full px-2 py-2 rounded-lg border border-slate-300 text-sm text-center">
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-600 mb-1">Boş</label>
                             <input type="number" name="bos" value="0" min="0"
-                                class="w-full px-2 py-2 rounded-lg border border-slate-300 text-sm text-center font-bold text-slate-500">
+                                class="w-full px-2 py-2 rounded-lg border border-slate-300 text-sm text-center">
                         </div>
                     </div>
 
@@ -125,24 +119,24 @@
                         <div>
                             <label class="block text-xs font-semibold text-slate-600 mb-1">Puan</label>
                             <input type="number" name="puan" value="0" min="0" max="100" required
-                                class="w-full px-3 py-2 rounded-lg border border-indigo-200 bg-indigo-50/50 text-sm font-extrabold text-indigo-700 text-center">
+                                class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm font-bold text-indigo-700 text-center">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-amber-700 mb-1">Sınıf Derecesi</label>
-                            <input type="text" name="derece" placeholder="1, 2 vb."
-                                class="w-full px-3 py-2 rounded-lg border border-amber-300 bg-amber-50 focus:ring-2 focus:ring-amber-500 text-sm font-bold text-center text-amber-800">
+                            <label class="block text-xs font-semibold text-amber-700 mb-1">Sınıf Derecesi (Opsiyonel)</label>
+                            <input type="text" name="derece" placeholder="Örn: 1 veya 2"
+                                class="w-full px-3 py-2 rounded-lg border border-amber-300 bg-amber-50 focus:ring-2 focus:ring-amber-500 text-sm font-bold text-center">
                         </div>
                     </div>
 
                     <button type="submit" 
                         class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl shadow-md transition text-xs mt-2">
-                        Kaydet / Güncelle 💾
+                        Sonucu Kaydet / Güncelle 💾
                     </button>
                 </form>
 
                 <hr class="my-4 border-slate-200">
 
-                <!-- TOPLU EXCEL YÜKLEME -->
+                <!-- EXCEL TOPLU YÜKLEME -->
                 <div class="space-y-2">
                     <h3 class="text-xs font-bold text-slate-700">Toplu Excel Yükle (.xlsx)</h3>
                     <form method="POST" action="/admin/excel-yukle" enctype="multipart/form-data" class="space-y-2">
@@ -156,112 +150,61 @@
                 </div>
             </div>
 
-            <!-- SAĞ KOLON: KAYITLI ÖĞRENCİLER VE TÜM SINAV GEÇMİŞLERİ -->
+            <!-- TABLO: KAYITLI ÖĞRENCİ LİSTESİ -->
             <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
                 <div class="flex justify-between items-center border-b pb-3">
-                    <h2 class="text-base font-bold text-slate-800">Kayıtlı Öğrenciler ve Sınav Karneleri</h2>
-                    <span class="text-xs font-bold bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full border border-indigo-100">
-                        Toplam Öğrenci: {{ veriler|length }}
-                    </span>
+                    <h2 class="text-base font-bold text-slate-800">Kayıtlı Öğrenci ve Sınav Listesi</h2>
+                    <span class="text-xs font-bold bg-slate-100 px-3 py-1 rounded-full text-slate-600">Toplam {{ veriler|length }} Öğrenci</span>
                 </div>
 
-                <div class="space-y-3">
-                    {% for no, bilgi in veriler.items() %}
-                    <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
-                        
-                        <div class="flex justify-between items-center">
-                            <div>
-                                <span class="text-[11px] font-bold bg-indigo-600 text-white px-2 py-0.5 rounded mr-2">No: {{ no }}</span>
-                                <span class="text-sm font-extrabold text-slate-800">{{ bilgi.ad }}</span>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <button onclick="ogrenciSec('{{ no }}', '{{ bilgi.ad }}')" class="text-xs bg-indigo-50 text-indigo-700 font-bold px-2.5 py-1 rounded-lg border border-indigo-200 hover:bg-indigo-100 transition">
-                                    + Not Ekle
-                                </button>
-                                <a href="/admin/ogrenci-sil/{{ no }}" onclick="return confirm('Bu öğrenciyi ve TÜM sınavlarını silmek istediğinize emin misiniz?')" class="text-xs text-rose-600 font-bold px-2 py-1 rounded bg-rose-50 border border-rose-200 hover:bg-rose-100 transition">
-                                    Sil
-                                </a>
-                            </div>
-                        </div>
-
-                        <!-- ÖĞRENCİNİN SINAVLARI -->
-                        <div class="space-y-1.5 pt-2 border-t border-slate-200/60">
-                            {% for s in bilgi.sinavlar %}
-                            <div class="flex items-center justify-between text-xs bg-white px-3 py-2 rounded-lg border border-slate-200">
-                                <div class="flex items-center gap-3">
-                                    <span class="font-bold text-slate-700">{{ s.sinav }}</span>
-                                    <span class="text-slate-400">|</span>
-                                    <span class="text-emerald-600 font-semibold">D: {{ s.dogru }}</span>
-                                    <span class="text-rose-600 font-semibold">Y: {{ s.yanlis }}</span>
-                                    <span class="text-slate-500 font-semibold">B: {{ s.bos }}</span>
-                                    <span class="bg-indigo-50 text-indigo-700 font-extrabold px-2 py-0.5 rounded border border-indigo-100">
-                                        {{ s.puan }} Puan
-                                    </span>
-                                    {% if s.derece %}
-                                    <span class="bg-amber-100 text-amber-800 font-black px-2 py-0.5 rounded text-[11px] border border-amber-200">
-                                        🏆 {{ s.derece }}. Sınıf Derecesi
-                                    </span>
-                                    {% endif %}
-                                </div>
-                                <a href="/admin/sinav-sil/{{ no }}/{{ s.sinav }}" onclick="return confirm('Bu sınav sonucunu silmek istediğinize emin misiniz?')" class="text-rose-500 hover:text-rose-700 font-bold text-sm px-1.5" title="Sınavı Sil">
-                                    ×
-                                </a>
-                            </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead>
+                            <tr class="bg-slate-50 text-slate-500 border-b">
+                                <th class="p-2.5">No</th>
+                                <th class="p-2.5">Ad Soyad</th>
+                                <th class="p-2.5">Sınav Geçmişi</th>
+                                <th class="p-2.5 text-right">İşlem</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            {% for no, bilgi in veriler.items() %}
+                            <tr class="hover:bg-slate-50/80 transition">
+                                <td class="p-2.5 font-bold text-indigo-600">{{ no }}</td>
+                                <td class="p-2.5 font-bold text-slate-800">{{ bilgi.ad }}</td>
+                                <td class="p-2.5 space-y-1">
+                                    {% for s in bilgi.sinavlar %}
+                                    <div class="flex items-center gap-2 text-[11px] bg-slate-100 px-2 py-1 rounded-md border border-slate-200/60 justify-between">
+                                        <div>
+                                            <span class="font-semibold text-slate-700">{{ s.sinav }}:</span>
+                                            <span class="font-extrabold text-indigo-700 ml-1">{{ s.puan }} Puan</span>
+                                            {% if s.derece %}
+                                            <span class="bg-amber-100 text-amber-800 font-extrabold px-1.5 py-0.5 rounded text-[10px] ml-1">
+                                                🏆 {{ s.derece }}.
+                                            </span>
+                                            {% endif %}
+                                        </div>
+                                        <a href="/admin/sinav-sil/{{ no }}/{{ s.sinav }}" onclick="return confirm('Bu sınav sonucunu silmek istediğinize emin misiniz?')" class="text-rose-500 hover:text-rose-700 font-bold ml-2">×</a>
+                                    </div>
+                                    {% endfor %}
+                                </td>
+                                <td class="p-2.5 text-right">
+                                    <a href="/admin/ogrenci-sil/{{ no }}" onclick="return confirm('Öğrenciyi ve TÜM sınavlarını silmek istediğinize emin misiniz?')" class="text-rose-600 hover:underline font-bold">Sil</a>
+                                </td>
+                            </tr>
                             {% else %}
-                            <div class="text-xs text-slate-400 italic py-1">Bu öğrenciye ait henüz girilmiş sınav sonucu bulunmuyor.</div>
+                            <tr>
+                                <td colspan="4" class="text-center py-8 text-slate-400">Henüz hiçbir öğrenci veya sınav sonucu eklenmedi.</td>
+                            </tr>
                             {% endfor %}
-                        </div>
-
-                    </div>
-                    {% else %}
-                    <div class="text-center py-12 text-slate-400 text-xs">
-                        Henüz kayıtlı öğrenci bulunmuyor. Sol taraftan öğrenci ekleyebilirsiniz.
-                    </div>
-                    {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
         </div>
 
     </main>
-
-    <!-- OTOMATİK İSİM VE HIZLI SEÇİM SCRIPT'İ -->
-    <script>
-        const noInput = document.getElementById('ogrenci_no_input');
-        const adInput = document.getElementById('ad_input');
-        const bilgiSpan = document.getElementById('otomatik_bilgi');
-
-        function ogrenciSec(no, ad) {
-            if(noInput && adInput) {
-                noInput.value = no;
-                adInput.value = ad;
-                if(bilgiSpan) bilgiSpan.classList.remove('hidden');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-                noInput.focus();
-            }
-        }
-
-        if (noInput && adInput) {
-            noInput.addEventListener('input', function() {
-                const no = this.value.trim();
-                if (no.length > 0) {
-                    fetch('/admin/ogrenci-ara/' + encodeURIComponent(no))
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.bulundu) {
-                                adInput.value = data.ad;
-                                if(bilgiSpan) bilgiSpan.classList.remove('hidden');
-                            } else {
-                                if(bilgiSpan) bilgiSpan.classList.add('hidden');
-                            }
-                        })
-                        .catch(err => console.error(err));
-                } else {
-                    if(bilgiSpan) bilgiSpan.classList.add('hidden');
-                }
-            });
-        }
-    </script>
 
     {% endif %}
 

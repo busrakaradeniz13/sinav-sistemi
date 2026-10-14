@@ -15,8 +15,7 @@ app.secret_key = "ogretmen_cok_gizli_guvenlik_anahtari_98765"
 
 ADMIN_PASSWORD = "1234"
 
-# ÖRNEK VERİ YAPISI: Her öğrenci numarasının altında bir "liste" bulunur.
-# Böylece aynı öğrencinin birden fazla sınav sonucu saklanabilir.
+# Veri Yapısı: Her öğrenci numarasının adı ve sınav listesi tutulur
 sinav_verileri = {
     "101": {
         "ad": "Ahmet Yılmaz",
@@ -51,7 +50,7 @@ sinav_verileri = {
 
 
 # ==========================================
-# 1. VELİ SORGULAMA SAYfASI (Tüm Sınavları Listeleme)
+# 1. VELİ SORGULAMA SAYFASI
 # ==========================================
 @app.route("/", methods=["GET", "POST"])
 def veli_sorgula():
@@ -64,12 +63,9 @@ def veli_sorgula():
     if not ogrenci_no:
       hata = "Lütfen geçerli bir öğrenci numarası giriniz."
     elif ogrenci_no in sinav_verileri:
-      sonuc = sinav_verileri[ogrenci_no]  # Öğrencinin adı ve tüm sınav listesi
+      sonuc = sinav_verileri[ogrenci_no]
     else:
-      hata = (
-          "Bu numaraya ait sınav sonucu bulunamadı. Lütfen numarayı kontrol"
-          " ediniz."
-      )
+      hata = "Bu numaraya ait öğrenci veya sınav sonucu bulunamadı."
 
   return render_template("sorgula.html", sonuc=sonuc, hata=hata)
 
@@ -105,7 +101,7 @@ def admin_cikis():
   return redirect(url_for("admin_panel"))
 
 
-# --- YENİ SINAV SONUCU EKLEME ---
+# --- ÖĞRENCİYE YENİ SINAV EKLE / GÜNCELLE ---
 @app.route("/admin/kaydet", methods=["POST"])
 def ogrenci_kaydet():
   if not session.get("admin_logged_in"):
@@ -124,41 +120,55 @@ def ogrenci_kaydet():
   }
 
   if ogrenci_no and ad:
-    # Eğer bu numara daha önce kayıtlı değilse yeni öğrenci aç
     if ogrenci_no not in sinav_verileri:
       sinav_verileri[ogrenci_no] = {"ad": ad, "sinavlar": []}
 
-    # Öğrencinin adını güncelle (belki değişmiştir)
     sinav_verileri[ogrenci_no]["ad"] = ad
+    mevcut = sinav_verileri[ogrenci_no]["sinavlar"]
 
-    # Aynı sınav adına ait eski sonuç varsa güncelle, yoksa yeni ekle
-    mevcut_sinavlar = sinav_verileri[ogrenci_no]["sinavlar"]
-    bulundu = False
-    for s in mevcut_sinavlar:
+    # Aynı sınav adına sahip kayıt varsa güncelle, yoksa ekle
+    guncellendi = False
+    for s in mevcut:
       if s["sinav"] == sinav_adi:
         s.update(yeni_sinav)
-        bulundu = True
+        guncellendi = True
         break
 
-    if not bulundu:
-      mevcut_sinavlar.append(yeni_sinav)
+    if not guncellendi:
+      mevcut.append(yeni_sinav)
 
     flash(
-        f"{ad} için '{sinav_adi'}' sonucu başarıyla kaydedildi!", "success"
+        f"{ad} (No: {ogrenci_no}) için '{sinav_adi}' kaydedildi!", "success"
     )
 
   return redirect(url_for("admin_panel"))
 
 
-# --- ÖĞRENCİNİN TÜM KAYITLARINI SİL ---
-@app.route("/admin/sil/<ogrenci_no>")
+# --- ÖĞRENCİYİ SİSTEMDEN TAMAMEN SİL ---
+@app.route("/admin/ogrenci-sil/<ogrenci_no>")
 def ogrenci_sil(ogrenci_no):
   if not session.get("admin_logged_in"):
     return redirect(url_for("admin_panel"))
 
   if ogrenci_no in sinav_verileri:
     del sinav_verileri[ogrenci_no]
-    flash("Öğrencinin tüm sınav kayıtları silindi.", "info")
+    flash("Öğrenci ve tüm sınav geçmişi silindi.", "info")
+
+  return redirect(url_for("admin_panel"))
+
+
+# --- ÖĞRENCİNİN BELİRLİ BİR SINAVINI SİL ---
+@app.route("/admin/sinav-sil/<ogrenci_no>/<sinav_adi>")
+def sinav_sil(ogrenci_no, sinav_adi):
+  if not session.get("admin_logged_in"):
+    return redirect(url_for("admin_panel"))
+
+  if ogrenci_no in sinav_verileri:
+    sinavlar = sinav_verileri[ogrenci_no]["sinavlar"]
+    sinav_verileri[ogrenci_no]["sinavlar"] = [
+        s for s in sinavlar if s["sinav"] != sinav_adi
+    ]
+    flash(f"'{sinav_adi}' sınav sonucu silindi.", "info")
 
   return redirect(url_for("admin_panel"))
 
@@ -194,9 +204,8 @@ def excel_yukle():
           sinav_verileri[no] = {"ad": ad, "sinavlar": []}
 
         sinav_verileri[no]["ad"] = ad
-
-        # Aynı sınav varsa güncelle, yoksa listeye ekle
         mevcut = sinav_verileri[no]["sinavlar"]
+
         eklendi = False
         for s in mevcut:
           if s["sinav"] == sinav_adi:
@@ -206,7 +215,7 @@ def excel_yukle():
         if not eklendi:
           mevcut.append(yeni_sinav)
 
-      flash("Excel başarıyla toplu olarak yüklendi!", "success")
+      flash("Excel başarıyla içe aktarıldı!", "success")
     except Exception as e:
       flash(f"Hata: {str(e)}", "error")
 

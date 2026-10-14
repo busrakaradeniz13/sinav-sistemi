@@ -18,7 +18,7 @@ app.secret_key = "ogretmen_cok_gizli_guvenlik_anahtari_98765"
 ADMIN_PASSWORD = "1234"
 YEDEK_DOSYA_YOLU = "notlar_yedek.xlsx"
 
-# Varsayılan deneme verileri
+# Varsayılan başlangıç verileri
 sinav_verileri = {
     "101": {
         "ad": "Ahmet Yılmaz",
@@ -32,29 +32,7 @@ sinav_verileri = {
                 "derece": "1",
             }
         ],
-    },
-    "102": {
-        "ad": "Ayşe Demir",
-        "sinavlar": [{
-            "sinav": "Matematik 1. Yazılı",
-            "dogru": 20,
-            "yanlis": 0,
-            "bos": 0,
-            "puan": 100,
-            "derece": "2",
-        }],
-    },
-    "103": {
-        "ad": "Mehmet Kaya",
-        "sinavlar": [{
-            "sinav": "Matematik 1. Yazılı",
-            "dogru": 17,
-            "yanlis": 3,
-            "bos": 0,
-            "puan": 85,
-            "derece": "3",
-        }],
-    },
+    }
 }
 
 
@@ -165,33 +143,15 @@ def verileri_excele_yedekle():
 @app.route("/", methods=["GET", "POST"])
 def veli_sorgula():
   sonuc, hata = None, None
-  en_iyi_derece = None
-
   if request.method == "POST":
     ogrenci_no = request.form.get("ogrenci_no", "").strip()
     if not ogrenci_no:
       hata = "Lütfen geçerli bir öğrenci numarası giriniz."
     elif ogrenci_no in sinav_verileri:
       sonuc = sinav_verileri[ogrenci_no]
-      # İlk 3 derece kontrolünü python tarafında temizce yapıp şablona gönderiyoruz
-      for s in sonuc.get("sinavlar", []):
-        d_str = (
-            str(s.get("derece", ""))
-            .replace(".", "")
-            .replace("ncı", "")
-            .replace("nci", "")
-            .replace("üncü", "")
-            .strip()
-        )
-        if d_str in ["1", "2", "3"]:
-          en_iyi_derece = d_str
-          break
     else:
       hata = "Bu numaraya ait öğrenci veya sınav sonucu bulunamadı."
-
-  return render_template(
-      "sorgula.html", sonuc=sonuc, hata=hata, en_iyi_derece=en_iyi_derece
-  )
+  return render_template("sorgula.html", sonuc=sonuc, hata=hata)
 
 
 @app.route("/admin", methods=["GET", "POST"])
@@ -269,3 +229,87 @@ def ogrenci_kaydet():
 
 
 @app.route("/admin/ogrenci-sil/<ogrenci_no>")
+def ogrenci_sil(ogrenci_no):
+  if not session.get("admin_logged_in"):
+    return redirect(url_for("admin_panel"))
+  if ogrenci_no in sinav_verileri:
+    del sinav_verileri[ogrenci_no]
+    verileri_excele_yedekle()
+    flash("Öğrenci silindi.", "info")
+  return redirect(url_for("admin_panel"))
+
+
+@app.route("/admin/sinav-sil/<ogrenci_no>/<path:sinav_adi>")
+def sinav_sil(ogrenci_no, sinav_adi):
+  if not session.get("admin_logged_in"):
+    return redirect(url_for("admin_panel"))
+  if ogrenci_no in sinav_verileri:
+    sinavlar = sinav_verileri[ogrenci_no]["sinavlar"]
+    sinav_verileri[ogrenci_no]["sinavlar"] = [
+        s for s in sinavlar if s["sinav"] != sinav_adi
+    ]
+    verileri_excele_yedekle()
+    flash("Sınav sonucu silindi.", "info")
+  return redirect(url_for("admin_panel"))
+
+
+@app.route("/admin/excel-yukle", methods=["POST"])
+def excel_yukle():
+  if not session.get("admin_logged_in"):
+    return redirect(url_for("admin_panel"))
+
+  dosya = request.files.get("excel_dosya")
+  if dosya:
+    try:
+      dosya.seek(0)
+      dosya.save(YEDEK_DOSYA_YOLU)
+      yedekten_verileri_yukle()
+      flash("Excel başarıyla yüklendi ve arşivlendi!", "success")
+    except Exception as e:
+      flash(f"Excel yüklenirken hata: {str(e)}", "error")
+
+  return redirect(url_for("admin_panel"))
+
+
+@app.route("/admin/excel-indir")
+def excel_indir():
+  if not session.get("admin_logged_in"):
+    return redirect(url_for("admin_panel"))
+
+  try:
+    satirlar = []
+    for no, bilgi in sinav_verileri.items():
+      ad = bilgi["ad"]
+      for s in bilgi["sinavlar"]:
+        satirlar.append({
+            "ogrenci_no": no,
+            "ad": ad,
+            "sinav": s["sinav"],
+            "dogru": s["dogru"],
+            "yanlis": s["yanlis"],
+            "bos": s["bos"],
+            "puan": s["puan"],
+            "derece": s.get("derece", ""),
+        })
+
+    df = pd.DataFrame(satirlar)
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+      df.to_excel(writer, index=False)
+    output.seek(0)
+
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name="Büşra Güngör Öğrenci Sınav Sonuçları.xlsx",
+        mimetype=(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        ),
+    )
+  except Exception as e:
+    flash(f"İndirme sırasında bir hata oluştu: {str(e)}", "error")
+    return redirect(url_for("admin_panel"))
+
+
+if __name__ == "__main__":
+  app.run(debug=False, port=5000)

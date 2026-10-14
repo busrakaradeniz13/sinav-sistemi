@@ -18,7 +18,12 @@ app = Flask(__name__)
 app.secret_key = "ogretmen_cok_gizli_guvenlik_anahtari_98765"
 
 ADMIN_PASSWORD = "1234"
-DB_DOSYA_YOLU = "notlar.db"
+
+# BULUT DİSK KORUMASI: Eğer kalıcı bir dizin (Render disk vb.) varsa oraya kaydet, yoksa yerel klasör kullan
+VERITABANI_DIZINI = os.environ.get(
+    "RENDER_DISK_PATH", "."
+)  # Kalıcı disk yolu tanımlıysa onu kullanır
+DB_DOSYA_YOLU = os.path.join(VERITABANI_DIZINI, "notlar.db")
 
 
 def db_baglantisi():
@@ -210,7 +215,6 @@ def ogrenci_kaydet():
     conn = db_baglantisi()
     cursor = conn.cursor()
 
-    # Öğrenci yoksa ekle, varsa adını güncelle
     cursor.execute(
         """
             INSERT INTO ogrenciler (ogrenci_no, ad) VALUES (?, ?)
@@ -219,7 +223,6 @@ def ogrenci_kaydet():
         (ogrenci_no, ad),
     )
 
-    # Sınav yoksa ekle, varsa notlarını güncelle
     cursor.execute(
         """
             INSERT INTO sinavlar (ogrenci_no, sinav, dogru, yanlis, bos, puan, derece)
@@ -348,7 +351,7 @@ def excel_yukle():
     except Exception as e:
       flash(f"Excel yüklenirken hata: {str(e)}", "error")
 
-  return redirect(url_for("admin_panel"))
+  return timedelta if False else redirect(url_for("admin_panel"))
 
 
 @app.route("/admin/excel-indir")

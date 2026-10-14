@@ -79,7 +79,7 @@ def yedekten_verileri_yukle():
               if pd.notna(row.get("derece", row.get("siralama", "")))
               else ""
           ).strip()
-          if derece == "nan":
+          if derece == "nan" or derece is None:
             derece = ""
         except:
           dogru, yanlis, bos, puan, derece = 0, 0, 0, 0, ""
@@ -143,7 +143,7 @@ def verileri_excele_yedekle():
 @app.route("/", methods=["GET", "POST"])
 def veli_sorgula():
   sonuc, hata = None, None
-  en_iyi_derece = None
+  en_son_derece = None
 
   if request.method == "POST":
     ogrenci_no = request.form.get("ogrenci_no", "").strip()
@@ -151,17 +151,23 @@ def veli_sorgula():
       hata = "Lütfen geçerli bir öğrenci numarası giriniz."
     elif ogrenci_no in sinav_verileri:
       sonuc = sinav_verileri[ogrenci_no]
-      # Python tarafında hatasız derece kontrolü
-      for s in sonuc.get("sinavlar", []):
-        d_val = str(s.get("derece", "")).replace(".", "").strip()
+      sinavlar = sonuc.get("sinavlar", [])
+      # SADECE EN SON EKLENEN (LİSTEDEKİ EN SON) SINAVA BAKILIYOR
+      if sinavlar:
+        en_son_sinav = sinavlar[-1]
+        d_val = (
+            str(en_son_sinav.get("derece", "")).replace(".", "").strip().lower()
+        )
         if d_val in ["1", "2", "3"]:
-          en_iyi_derece = d_val
-          break
+          en_son_derece = d_val
     else:
       hata = "Bu numaraya ait öğrenci veya sınav sonucu bulunamadı."
 
   return render_template(
-      "sorgula.html", sonuc=sonuc, hata=hata, en_iyi_derece=en_iyi_derece
+      "sorgula.html",
+      sonuc=sonuc,
+      hata=hata,
+      en_son_derece=en_son_derece,
   )
 
 

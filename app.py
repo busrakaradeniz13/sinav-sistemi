@@ -18,7 +18,7 @@ app.secret_key = "ogretmen_cok_gizli_guvenlik_anahtari_98765"
 ADMIN_PASSWORD = "1234"
 YEDEK_DOSYA_YOLU = "notlar_yedek.xlsx"
 
-# Varsayılan başlangıç verileri (derece desteği eklendi)
+# Varsayılan başlangıç verileri
 sinav_verileri = {
     "101": {
         "ad": "Ahmet Yılmaz",
@@ -30,32 +30,12 @@ sinav_verileri = {
                 "bos": 0,
                 "puan": 90,
                 "derece": "1",
-            },
-            {
-                "sinav": "Türkçe 1. Yazılı",
-                "dogru": 15,
-                "yanlis": 5,
-                "bos": 0,
-                "puan": 75,
-                "derece": "",
-            },
+            }
         ],
-    },
-    "102": {
-        "ad": "Ayşe Demir",
-        "sinavlar": [{
-            "sinav": "Matematik 1. Yazılı",
-            "dogru": 20,
-            "yanlis": 0,
-            "bos": 0,
-            "puan": 100,
-            "derece": "2",
-        }],
-    },
+    }
 }
 
 
-# --- SİSTEM AÇILDIĞINDA ARŞİVDEKİ EXCELİ OKU ---
 def yedekten_verileri_yukle():
   global sinav_verileri
   if os.path.exists(YEDEK_DOSYA_YOLU):
@@ -137,7 +117,6 @@ def yedekten_verileri_yukle():
 yedekten_verileri_yukle()
 
 
-# --- YAPILAN DEĞİŞİKLİKLERİ ARŞİVE KAYDET ---
 def verileri_excele_yedekle():
   try:
     satirlar = []
@@ -292,7 +271,6 @@ def excel_yukle():
   return redirect(url_for("admin_panel"))
 
 
-# --- HAFIZADAN DOĞRUDAN ÖZEL İSİMLİ EXCEL OLUŞTURUP İNDİRME ---
 @app.route("/admin/excel-indir")
 def excel_indir():
   if not session.get("admin_logged_in"):
@@ -315,8 +293,6 @@ def excel_indir():
         })
 
     df = pd.DataFrame(satirlar)
-
-    # Dosyayı sunucu diskine kaydetmek yerine RAM'de (bellekte) Excel baytlarına dönüştürüyoruz
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
       df.to_excel(writer, index=False)

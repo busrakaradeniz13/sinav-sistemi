@@ -18,7 +18,7 @@ app.secret_key = "ogretmen_cok_gizli_guvenlik_anahtari_98765"
 ADMIN_PASSWORD = "1234"
 YEDEK_DOSYA_YOLU = "notlar_yedek.xlsx"
 
-# Varsayılan başlangıç verileri
+# Varsayılan deneme verileri
 sinav_verileri = {
     "101": {
         "ad": "Ahmet Yılmaz",
@@ -143,15 +143,26 @@ def verileri_excele_yedekle():
 @app.route("/", methods=["GET", "POST"])
 def veli_sorgula():
   sonuc, hata = None, None
+  en_iyi_derece = None
+
   if request.method == "POST":
     ogrenci_no = request.form.get("ogrenci_no", "").strip()
     if not ogrenci_no:
       hata = "Lütfen geçerli bir öğrenci numarası giriniz."
     elif ogrenci_no in sinav_verileri:
       sonuc = sinav_verileri[ogrenci_no]
+      # Python tarafında hatasız derece kontrolü
+      for s in sonuc.get("sinavlar", []):
+        d_val = str(s.get("derece", "")).replace(".", "").strip()
+        if d_val in ["1", "2", "3"]:
+          en_iyi_derece = d_val
+          break
     else:
       hata = "Bu numaraya ait öğrenci veya sınav sonucu bulunamadı."
-  return render_template("sorgula.html", sonuc=sonuc, hata=hata)
+
+  return render_template(
+      "sorgula.html", sonuc=sonuc, hata=hata, en_iyi_derece=en_iyi_derece
+  )
 
 
 @app.route("/admin", methods=["GET", "POST"])

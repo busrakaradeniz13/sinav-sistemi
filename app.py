@@ -15,7 +15,7 @@ app.secret_key = "ogretmen_cok_gizli_guvenlik_anahtari_98765"
 
 ADMIN_PASSWORD = "1234"
 
-# Veri Yapısı: Her öğrenci numarasının adı ve sınav listesi tutulur
+# Örnek başlangıç verileri (Panelde test edebilmeniz için garantili veri yapısı)
 sinav_verileri = {
     "101": {
         "ad": "Ahmet Yılmaz",
@@ -101,7 +101,7 @@ def admin_cikis():
   return redirect(url_for("admin_panel"))
 
 
-# --- ÖĞRENCİYE YENİ SINAV EKLE / GÜNCELLE ---
+# --- ÖĞRENCİ / SINAV KAYDET ---
 @app.route("/admin/kaydet", methods=["POST"])
 def ogrenci_kaydet():
   if not session.get("admin_logged_in"):
@@ -111,54 +111,67 @@ def ogrenci_kaydet():
   ad = request.form.get("ad", "").strip()
   sinav_adi = request.form.get("sinav", "Genel Sınav").strip()
 
+  try:
+    dogru = int(request.form.get("dogru", 0))
+    yanlis = int(request.form.get("yanlis", 0))
+    bos = int(request.form.get("bos", 0))
+    puan = int(request.form.get("puan", 0))
+  except ValueError:
+    dogru, yanlis, bos, puan = 0, 0, 0, 0
+
   yeni_sinav = {
       "sinav": sinav_adi,
-      "dogru": int(request.form.get("dogru", 0)),
-      "yanlis": int(request.form.get("yanlis", 0)),
-      "bos": int(request.form.get("bos", 0)),
-      "puan": int(request.form.get("puan", 0)),
+      "dogru": dogru,
+      "yanlis": yanlis,
+      "bos": bos,
+      "puan": puan,
   }
 
   if ogrenci_no and ad:
     if ogrenci_no not in sinav_verileri:
       sinav_verileri[ogrenci_no] = {"ad": ad, "sinavlar": []}
 
+    # İsmi güncelle (Numara aynı kalıp isim düzeltilmek istenirse)
     sinav_verileri[ogrenci_no]["ad"] = ad
-    mevcut = sinav_verileri[ogrenci_no]["sinavlar"]
+    mevcut_sinavlar = sinav_verileri[ogrenci_no]["sinavlar"]
 
-    # Aynı sınav adına sahip kayıt varsa güncelle, yoksa ekle
+    # Aynı sınav adına sahip kayıt varsa güncelle, yoksa listeye ekle
     guncellendi = False
-    for s in mevcut:
-      if s["sinav"] == sinav_adi:
+    for s in mevcut_sinavlar:
+      if s["sinav"].lower() == sinav_adi.lower():
         s.update(yeni_sinav)
         guncellendi = True
         break
 
     if not guncellendi:
-      mevcut.append(yeni_sinav)
+      mevcut_sinavlar.append(yeni_sinav)
 
     flash(
-        f"{ad} (No: {ogrenci_no}) için '{sinav_adi}' kaydedildi!", "success"
+        f"İşlem Başarılı: {ad} (No: {ogrenci_no}) - {sinav_adi} kaydedildi.",
+        "success",
     )
 
   return redirect(url_for("admin_panel"))
 
 
-# --- ÖĞRENCİYİ SİSTEMDEN TAMAMEN SİL ---
+# --- ÖĞRENCİYİ KOMPLE SİL ---
 @app.route("/admin/ogrenci-sil/<ogrenci_no>")
 def ogrenci_sil(ogrenci_no):
   if not session.get("admin_logged_in"):
     return redirect(url_for("admin_panel"))
 
   if ogrenci_no in sinav_verileri:
+    silinen_ad = sinav_verileri[ogrenci_no]["ad"]
     del sinav_verileri[ogrenci_no]
-    flash("Öğrenci ve tüm sınav geçmişi silindi.", "info")
+    flash(
+        f"{silinen_ad} adlı öğrencinin tüm kayıtları sistemden silindi.", "info"
+    )
 
   return redirect(url_for("admin_panel"))
 
 
-# --- ÖĞRENCİNİN BELİRLİ BİR SINAVINI SİL ---
-@app.route("/admin/sinav-sil/<ogrenci_no>/<sinav_adi>")
+# --- BELİRLİ BİR SINAVI SİL ---
+@app.route("/admin/sinav-sil/<ogrenci_no>/<path:sinav_adi>")
 def sinav_sil(ogrenci_no, sinav_adi):
   if not session.get("admin_logged_in"):
     return redirect(url_for("admin_panel"))
@@ -173,7 +186,7 @@ def sinav_sil(ogrenci_no, sinav_adi):
   return redirect(url_for("admin_panel"))
 
 
-# --- EXCEL İLE TOPLU YÜKLEME ---
+# --- EXCEL YÜKLEME ---
 @app.route("/admin/excel-yukle", methods=["POST"])
 def excel_yukle():
   if not session.get("admin_logged_in"):
@@ -208,16 +221,16 @@ def excel_yukle():
 
         eklendi = False
         for s in mevcut:
-          if s["sinav"] == sinav_adi:
+          if s["sinav"].lower() == sinav_adi.lower():
             s.update(yeni_sinav)
             eklendi = True
             break
         if not eklendi:
           mevcut.append(yeni_sinav)
 
-      flash("Excel başarıyla içe aktarıldı!", "success")
+      flash("Excel dosyasındaki tüm veriler başarıyla aktarıldı!", "success")
     except Exception as e:
-      flash(f"Hata: {str(e)}", "error")
+      flash(f"Excel okunurken hata oluştu: {str(e)}", "error")
 
   return redirect(url_for("admin_panel"))
 

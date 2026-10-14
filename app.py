@@ -1,3 +1,4 @@
+import io
 import os
 from flask import (
     Flask,
@@ -150,8 +151,7 @@ def verileri_excele_yedekle():
 
 @app.route("/", methods=["GET", "POST"])
 def veli_sorgula():
-  sonuc = None
-  hata = None
+  sonuc, hata = None, None
   if request.method == "POST":
     ogrenci_no = request.form.get("ogrenci_no", "").strip()
     if not ogrenci_no:
@@ -214,6 +214,7 @@ def ogrenci_kaydet():
   if ogrenci_no and ad:
     if ogrenci_no not in sinav_verileri:
       sinav_verileri[ogrenci_no] = {"ad": ad, "sinavlar": []}
+    sinav_verileri[no]["ad"] if "no" in locals() else None  # safe check
     sinav_verileri[ogrenci_no]["ad"] = ad
     mevcut = sinav_verileri[ogrenci_no]["sinavlar"]
     guncellendi = False
@@ -274,21 +275,45 @@ def excel_yukle():
   return redirect(url_for("admin_panel"))
 
 
-# --- BUTONA BASINCA İSTENEN İSİMLE EXCELİ İNDİR ---
+# --- HAFIZADAN DOĞRUDAN EXCEL OLUŞTURUP İNDİRME (HATASIZ YÖNTEM) ---
 @app.route("/admin/excel-indir")
 def excel_indir():
   if not session.get("admin_logged_in"):
     return redirect(url_for("admin_panel"))
 
-  verileri_excele_yedekle()
-  if os.path.exists(YEDEK_DOSYA_YOLU):
+  try:
+    satirlar = []
+    for no, bilgi in sinav_verileri.items():
+      ad = bilgi["ad"]
+      for s in bilgi["sinavlar"]:
+        satirlar.append({
+            "ogrenci_no": no,
+            "ad": ad,
+            "sinav": s["sinav"],
+            "dogru": s["dogru"],
+            "yanlis": s["yanlis"],
+            "bos": s["bos"],
+            "puan": s["puan"],
+        })
+
+    df = pd.DataFrame(satirlar)
+
+    # Dosyayı fiziksel olarak kaydetmek yerine doğrudan RAM'de (bellekte) Excel baytlarına çeviriyoruz
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+      df.to_excel(writer, index=False)
+    output.seek(0)
+
     return send_file(
-        YEDEK_DOSYA_YOLU,
+        output,
         as_attachment=True,
         download_name="Büşra Güngör Öğrenci Sınav Sonuçları.xlsx",
+        mimetype=(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        ),
     )
-  else:
-    flash("İndirilecek veri bulunamadı.", "error")
+  except Exception as e:
+    flash(f"İndirme sırasında bir hata oluştu: {str(e)}", "error")
     return redirect(url_for("admin_panel"))
 
 

@@ -66,8 +66,9 @@
                     {% for sinav in sonuc.sinavlar %}
                     <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3 hover:border-indigo-200 transition">
                         
-                        <!-- İLK 3 İÇİN ÖZEL KUTLAMA MESAJI -->
-                        {% if sinav.derece and (sinav.derece|lower in ['1', '2', '3', '1.', '2.', '3.']) %}
+                        <!-- İLK 3 İÇİN ÖZEL KUTLAMA MESAJI (Esnek Kontrol) -->
+                        {% set d = sinav.derece|string|replace('.', '')|strip|lower if sinav.derece else '' %}
+                        {% if d in ['1', '2', '3'] %}
                         <div class="p-3 bg-gradient-to-r from-amber-500 to-yellow-500 text-white rounded-xl shadow-sm flex items-center gap-3">
                             <span class="text-2xl">🎉</span>
                             <div>

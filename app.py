@@ -16,7 +16,7 @@ app.secret_key = "ogretmen_cok_gizli_guvenlik_anahtari_98765"
 # ÖĞRETMEN GİRİŞ ŞİFRESİ
 ADMIN_PASSWORD = "1234"
 
-# Örnek başlangıç verileri (Bellek üstünde tutulan veri tabanı)
+# Örnek başlangıç verileri
 sinav_verileri = {
     "101": {
         "ad": "Ahmet Yılmaz",
@@ -38,7 +38,7 @@ sinav_verileri = {
 
 
 # ==========================================
-# 1. VELİ SORGULAMA BÖLÜMÜ (Sadece Ana Sayfa)
+# 1. VELİ SORGULAMA SAYFASI (Ana Sayfa)
 # ==========================================
 @app.route("/", methods=["GET", "POST"])
 def veli_sorgula():
@@ -62,44 +62,45 @@ def veli_sorgula():
 
 
 # ==========================================
-# 2. ÖĞRETMEN GİRİŞ VE YÖNETİM BÖLÜMÜ
+# 2. ÖĞRETMEN YÖNETİM PANELİ (Tek Adres: /admin)
 # ==========================================
-@app.route("/ogretmen-giris", methods=["GET", "POST"])
-def ogretmen_giris():
-  # Zaten giriş yapmışsa doğrudan panele yolla
-  if session.get("admin_logged_in"):
-    return redirect(url_for("ogretmen_panel"))
-
+@app.route("/admin", methods=["GET", "POST"])
+def admin_panel():
+  # Eğer POST ile şifre gönderildiyse kontrol et
   if request.method == "POST":
     sifre = request.form.get("sifre", "").strip()
     if sifre == ADMIN_PASSWORD:
       session["admin_logged_in"] = True
-      return redirect(url_for("ogretmen_panel"))
     else:
-      flash("Hatalı şifre! Lütfen tekrar deneyin.", "error")
+      flash("Hatalı şifre!", "error")
+      return render_template(
+          "admin.html", veriler=sinav_verileri, giris_yapildi=False
+      )
 
-  return render_template("login.html")
-
-
-@app.route("/ogretmen-cikis")
-def ogretmen_cikis():
-  session.clear()
-  return redirect(url_for("ogretmen_giris"))
-
-
-@app.route("/yonetim-paneli", methods=["GET"])
-def ogretmen_panel():
-  # Güvenlik kontrolü: Giriş yapmamışsa login sayfasına at
+  # Oturum açık değilse şifre ekranını göster (admin.html içinde şifre soracak)
   if not session.get("admin_logged_in"):
-    return redirect(url_for("ogretmen_giris"))
+    return render_template(
+        "admin.html", veriler=sinav_verileri, giris_yapildi=False
+    )
 
-  return render_template("admin.html", veriler=sinav_verileri)
+  # Oturum açıksa yönetim panelini göster
+  return render_template(
+      "admin.html", veriler=sinav_verileri, giris_yapildi=True
+  )
 
 
-@app.route("/yonetim-paneli/kaydet", methods=["POST"])
+# --- ÇIKIŞ YAP ---
+@app.route("/admin/cikis")
+def admin_cikis():
+  session.clear()
+  return redirect(url_for("admin_panel"))
+
+
+# --- ÖĞRENCİ KAYDET / GÜNCELLE ---
+@app.route("/admin/kaydet", methods=["POST"])
 def ogrenci_kaydet():
   if not session.get("admin_logged_in"):
-    return redirect(url_for("ogretmen_giris"))
+    return redirect(url_for("admin_panel"))
 
   ogrenci_no = request.form.get("ogrenci_no", "").strip()
   ad = request.form.get("ad", "").strip()
@@ -115,25 +116,27 @@ def ogrenci_kaydet():
     }
     flash("Öğrenci notu başarıyla kaydedildi!", "success")
 
-  return redirect(url_for("ogretmen_panel"))
+  return redirect(url_for("admin_panel"))
 
 
-@app.route("/yonetim-paneli/sil/<ogrenci_no>")
+# --- ÖĞRENCİ SİL ---
+@app.route("/admin/sil/<ogrenci_no>")
 def ogrenci_sil(ogrenci_no):
   if not session.get("admin_logged_in"):
-    return redirect(url_for("ogretmen_giris"))
+    return redirect(url_for("admin_panel"))
 
   if ogrenci_no in sinav_verileri:
     del sinav_verileri[ogrenci_no]
     flash("Öğrenci kaydı silindi.", "info")
 
-  return redirect(url_for("ogretmen_panel"))
+  return redirect(url_for("admin_panel"))
 
 
-@app.route("/yonetim-paneli/excel-yukle", methods=["POST"])
+# --- EXCEL YÜKLE ---
+@app.route("/admin/excel-yukle", methods=["POST"])
 def excel_yukle():
   if not session.get("admin_logged_in"):
-    return redirect(url_for("ogretmen_giris"))
+    return redirect(url_for("admin_panel"))
 
   dosya = request.files.get("excel_dosya")
   if dosya:
@@ -153,11 +156,11 @@ def excel_yukle():
             "bos": int(row.get("bos", 0)),
             "puan": int(row.get("puan", 0)),
         }
-      flash("Excel başarıyla yüklendi ve notlar güncellendi!", "success")
+      flash("Excel başarıyla yüklendi!", "success")
     except Exception as e:
-      flash(f"Excel okunurken hata oluştu: {str(e)}", "error")
+      flash(f"Hata: {str(e)}", "error")
 
-  return redirect(url_for("ogretmen_panel"))
+  return redirect(url_for("admin_panel"))
 
 
 if __name__ == "__main__":

@@ -180,68 +180,52 @@ def admin_panel():
     if sifre == ADMIN_PASSWORD:
       session["admin_logged_in"] = True
     else:
-      flash("Hatalı şifre!", "error")
+      flash("Hatalı yönetici şifresi!", "error")
       return render_template(
           "admin.html", veriler=sinav_verileri, giris_yapildi=False
       )
+
   if not session.get("admin_logged_in"):
     return render_template(
         "admin.html", veriler=sinav_verileri, giris_yapildi=False
     )
+
   return render_template(
       "admin.html", veriler=sinav_verileri, giris_yapildi=True
   )
 
 
-@app.route("/admin/yeni-ogrenci-ekle", methods=["POST"])
-def yeni_ogrenci_ekle():
+@app.route("/admin/cikis")
+def admin_cikis():
+  session.pop("admin_logged_in", None)
+  return redirect(url_for("admin_panel"))
+
+
+@app.route("/admin/kaydet", methods=["POST"])
+def ogrenci_kaydet():
   if not session.get("admin_logged_in"):
     return redirect(url_for("admin_panel"))
 
   ogrenci_no = request.form.get("ogrenci_no", "").strip()
   ad = request.form.get("ad", "").strip()
+  sinav_adi = request.form.get("sinav", "").strip()
+  derece = request.form.get("derece", "").strip()
 
-  if ogrenci_no and ad:
+  try:
+    dogru = int(request.form.get("dogru", 0))
+    yanlis = int(request.form.get("yanlis", 0))
+    bos = int(request.form.get("bos", 0))
+    puan = int(request.form.get("puan", 0))
+  except ValueError:
+    dogru, yanlis, bos, puan = 0, 0, 0, 0
+
+  if ogrenci_no and ad and sinav_adi:
     if ogrenci_no not in sinav_verileri:
       sinav_verileri[ogrenci_no] = {"ad": ad, "sinavlar": []}
-    else:
-      sinav_verileri[ogrenci_no]["ad"] = ad
-    verileri_excele_yedekle()
-    flash(f"Öğrenci kaydedildi: {ad} ({ogrenci_no})", "success")
-  else:
-    flash("Öğrenci numarası ve adı boş bırakılamaz!", "error")
 
-  return redirect(url_for("admin_panel"))
-
-
-@app.route("/admin/toplu-kaydet", methods=["POST"])
-def toplu_kaydet():
-  if not session.get("admin_logged_in"):
-    return redirect(url_for("admin_panel"))
-
-  sinav_adi = request.form.get("sinav_adi", "").strip()
-  if not sinav_adi:
-    flash("Lütfen geçerli bir ders / sınav adı giriniz!", "error")
-    return redirect(url_for("admin_panel"))
-
-  # Formdan gelen verileri öğrenci numaralarına göre gruplayıp işleyelim
-  # Form input isimleri: dogru_101, yanlis_101, bos_101, puan_101, derece_101 şeklinde olacak
-  guncellenen_sayisi = 0
-
-  for no in sinav_verileri.keys():
-    d_val = request.form.get(f"dogru_{no}", "0")
-    y_val = request.form.get(f"yanlis_{no}", "0")
-    b_val = request.form.get(f"bos_{no}", "0")
-    p_val = request.form.get(f"puan_{no}", "0")
-    derece = request.form.get(f"derece_{no}", "").strip()
-
-    try:
-      dogru = int(d_val)
-      yanlis = int(y_val)
-      bos = int(b_val)
-      puan = int(p_val)
-    except ValueError:
-      dogru, yanlis, bos, puan = 0, 0, 0, 0
+    # İsim güncellendiyse yansıt
+    sinav_verileri[ogrenci_no]["ad"] = ad
+    mevcut = sinav_verileri[ogrenci_no]["sinavlar"]
 
     yeni_sinav = {
         "sinav": sinav_adi,
@@ -252,24 +236,30 @@ def toplu_kaydet():
         "derece": derece,
     }
 
-    mevcut = sinav_verileri[no]["sinavlar"]
-    bulundu = False
+    guncellendi = False
     for s in mevcut:
       if s["sinav"].lower() == sinav_adi.lower():
         s.update(yeni_sinav)
-        bulundu = True
+        guncellendi = True
         break
-    if not bulundu:
+    if not guncellendi:
       mevcut.append(yeni_sinav)
-    guncellenen_sayisi += 1
 
-  verileri_excele_yedekle()
-  flash(
-      f"'{sinav_adi}' için {guncellenen_sayisi} öğrencinin notları başarıyla"
-      " kaydedildi!",
-      "success",
-  )
+    verileri_excele_yedekle()
+    flash(f"Başarılı: {ad} ({sinav_adi}) kaydedildi.", "success")
+  else:
+    flash("Öğrenci no, adı ve sınav adı boş bırakılamaz!", "error")
+
   return redirect(url_for("admin_panel"))
+
+
+@app.route("/admin/ogrenci-ara/<ogrenci_no>")
+def ogrenci_ara(ogrenci_no):
+  if not session.get("admin_logged_in"):
+    return jsonify({"bulundu": False})
+  if ogrenci_no in sinav_verileri:
+    return jsonify({"bulundu": True, "ad": sinav_verileri[ogrenci_no]["ad"]})
+  return jsonify({"bulundu": False})
 
 
 @app.route("/admin/ogrenci-sil/<ogrenci_no>")
@@ -279,7 +269,7 @@ def ogrenci_sil(ogrenci_no):
   if ogrenci_no in sinav_verileri:
     del sinav_verileri[ogrenci_no]
     verileri_excele_yedekle()
-    flash("Öğrenci silindi.", "info")
+    flash("Öğrenci sistemden silindi.", "info")
   return redirect(url_for("admin_panel"))
 
 
@@ -351,7 +341,7 @@ def excel_indir():
         ),
     )
   except Exception as e:
-    flash(f"İndirme sırasında bir hata oluştu: {str(e)}", "error")
+    flash(f"İndirme sırasında hata: {str(e)}", "error")
     return redirect(url_for("admin_panel"))
 
 

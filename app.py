@@ -125,7 +125,7 @@ def yedekten_verileri_yukle():
 yedekten_verileri_yukle()
 
 
-# --- VERİLERİ EXCELE KAYDETME FONKSİYONU ---
+# --- YAPILAN DEĞİŞİKLİKLERİ ARŞİVE KAYDET ---
 def verileri_excele_yedekle():
   try:
     satirlar = []
@@ -189,7 +189,6 @@ def admin_cikis():
   return redirect(url_for("admin_panel"))
 
 
-# --- KAYDETME İŞLEMİNDEN SONRA OTOMATİK EXCEL İNDİR ---
 @app.route("/admin/kaydet", methods=["POST"])
 def ogrenci_kaydet():
   if not session.get("admin_logged_in"):
@@ -226,14 +225,8 @@ def ogrenci_kaydet():
     if not guncellendi:
       mevcut.append(yeni_sinav)
 
-    # Sunucuya kaydet ve güncel Excel'i öğretmenin bilgisayarına otomatik indir
     verileri_excele_yedekle()
-    if os.path.exists(YEDEX_DOSYA_YOLU if 'YEDEX_DOSYA_YOLU' in globals() else YEDEK_DOSYA_YOLU):
-      return send_file(
-          YEDEK_DOSYA_YOLU,
-          as_attachment=True,
-          download_name="guncel_sinav_listesi.xlsx",
-      )
+    flash(f"Başarılı: {ad} - {sinav_adi} kaydedildi.", "success")
 
   return redirect(url_for("admin_panel"))
 
@@ -245,12 +238,7 @@ def ogrenci_sil(ogrenci_no):
   if ogrenci_no in sinav_verileri:
     del sinav_verileri[ogrenci_no]
     verileri_excele_yedekle()
-    # Silme işleminden sonra da güncel Excel'i indir
-    return send_file(
-        YEDEK_DOSYA_YOLU,
-        as_attachment=True,
-        download_name="guncel_sinav_listesi.xlsx",
-    )
+    flash("Öğrenci silindi.", "info")
   return redirect(url_for("admin_panel"))
 
 
@@ -264,15 +252,8 @@ def sinav_sil(ogrenci_no, sinav_adi):
         s for s in sinavlar if s["sinav"] != sinav_adi
     ]
     verileri_excele_yedekle()
-    # Sınav silme işleminden sonra güncel Excel'i indir
-    return send_file(
-        YEDEK_DOSYA_YOLU,
-        as_attachment=True,
-        download_name="guncel_sinav_listesi.xlsx",
-    )
-  return redirect(url_for("admin_payload")) if False else redirect(
-      url_for("admin_panel")
-  )
+    flash("Sınav sonucu silindi.", "info")
+  return redirect(url_for("admin_panel"))
 
 
 @app.route("/admin/excel-yukle", methods=["POST"])
@@ -283,7 +264,6 @@ def excel_yukle():
   dosya = request.files.get("excel_dosya")
   if dosya:
     try:
-      # Dışarıdan yüklenen orijinal Excel'i direkt sunucu arşivi olarak kaydet
       dosya.seek(0)
       dosya.save(YEDEK_DOSYA_YOLU)
       yedekten_verileri_yukle()
@@ -292,6 +272,24 @@ def excel_yukle():
       flash(f"Excel yüklenirken hata: {str(e)}", "error")
 
   return redirect(url_for("admin_panel"))
+
+
+# --- BUTONA BASINCA İSTENEN İSİMLE EXCELİ İNDİR ---
+@app.route("/admin/excel-indir")
+def excel_indir():
+  if not session.get("admin_logged_in"):
+    return redirect(url_for("admin_panel"))
+
+  verileri_excele_yedekle()
+  if os.path.exists(YEDEK_DOSYA_YOLU):
+    return send_file(
+        YEDEK_DOSYA_YOLU,
+        as_attachment=True,
+        download_name="Büşra Güngör Öğrenci Sınav Sonuçları.xlsx",
+    )
+  else:
+    flash("İndirilecek veri bulunamadı.", "error")
+    return redirect(url_for("admin_panel"))
 
 
 if __name__ == "__main__":

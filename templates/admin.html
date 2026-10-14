@@ -81,14 +81,14 @@
                 <form method="POST" action="/admin/kaydet" class="space-y-3">
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 mb-1">Öğrenci Numarası</label>
-                        <input type="text" id="ogrenci_no_input" name="ogrenci_no" required placeholder="Örn: 101" autofocus
+                        <input type="text" id="ogrenci_no_input" name="ogrenci_no" required placeholder="Örn: 101" autofocus autocomplete="off"
                             class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 text-sm font-bold">
                     </div>
 
                     <div>
                         <div class="flex justify-between items-center mb-1">
                             <label class="block text-xs font-semibold text-slate-600">Öğrenci Adı Soyadı</label>
-                            <span id="otomatik_bilgi" class="text-[10px] text-emerald-600 font-bold hidden">✓ Otomatik yüklendi</span>
+                            <span id="otomatik_bilgi" class="text-[10px] text-emerald-600 font-bold hidden">✓ Otomatik getirildi</span>
                         </div>
                         <input type="text" id="ad_input" name="ad" required placeholder="Örn: Ahmet Yılmaz"
                             class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 text-sm">
@@ -212,31 +212,50 @@
 
     </main>
 
-    <!-- OTOMATİK İSİM GETİRME SCRIPT'İ -->
+    <!-- SAYFA YÜKLENİRKEN KAYITLI ÖĞRENCİLERİ DOĞRUDAN HAFIZAYA ALAN VE ANINDA BULAN ÇİFT AŞAMALI SCRIPT -->
     <script>
+        // Sayfadaki tüm öğrencileri JavaScript hafızasına doğrudan aktarıyoruz (Ağ gecikmesini sıfırlar)
+        const ogrenciListesi = {
+            {% for no, bilgi in veriler.items() %}
+            "{{ no }}": "{{ bilgi.ad }}",
+            {% endfor %}
+        };
+
         const noInput = document.getElementById('ogrenci_no_input');
         const adInput = document.getElementById('ad_input');
         const bilgiSpan = document.getElementById('otomatik_bilgi');
 
-        if (noInput && adInput) {
-            noInput.addEventListener('input', function() {
-                const no = this.value.trim();
-                if (no.length > 0) {
-                    fetch('/admin/ogrenci-ara/' + encodeURIComponent(no))
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.bulundu) {
-                                adInput.value = data.ad;
-                                if(bilgiSpan) bilgiSpan.classList.remove('hidden');
-                            } else {
-                                if(bilgiSpan) bilgiSpan.classList.add('hidden');
-                            }
-                        })
-                        .catch(err => console.error(err));
-                } else {
-                    if(bilgiSpan) bilgiSpan.classList.add('hidden');
-                }
-            });
+        function isimAra() {
+            if (!noInput || !adInput) return;
+            const no = noInput.value.trim();
+
+            if (no in ogrenciListesi) {
+                // 1. Aşama: Sayfadaki yerel hafızadan milisaniye hızında getir
+                adInput.value = ogrenciListesi[no];
+                if (bilgiSpan) bilgiSpan.classList.remove('hidden');
+            } else if (no.length > 0) {
+                // 2. Aşama: Yerel hafızada bulamazsa arka plan API'sine sor
+                fetch('/admin/ogrenci-ara/' + encodeURIComponent(no))
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.bulundu) {
+                            adInput.value = data.ad;
+                            if (bilgiSpan) bilgiSpan.classList.remove('hidden');
+                        } else {
+                            if (bilgiSpan) bilgiSpan.classList.add('hidden');
+                        }
+                    })
+                    .catch(() => {});
+            } else {
+                if (bilgiSpan) bilgiSpan.classList.add('hidden');
+            }
+        }
+
+        if (noInput) {
+            // Yazarken, tuş bırakıldığında veya kutudan çıkıldığında anında tetiklenir
+            noInput.addEventListener('input', isimAra);
+            noInput.addEventListener('keyup', isimAra);
+            noInput.addEventListener('change', isimAra);
         }
     </script>
 

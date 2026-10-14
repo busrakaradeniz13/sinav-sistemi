@@ -6,16 +6,17 @@
     <title>Öğrenci Sınav Sonuçları Sorgulama</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @keyframes bounceSlow {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-8px); }
+        @keyframes popUp {
+            0% { transform: scale(0.6); opacity: 0; }
+            70% { transform: scale(1.05); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
         }
-        @keyframes glowPulse {
-            0%, 100% { box-shadow: 0 0 15px rgba(245, 158, 11, 0.6); }
-            50% { box-shadow: 0 0 35px rgba(245, 158, 11, 0.9); }
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.5); }
+            50% { box-shadow: 0 0 45px rgba(245, 158, 11, 0.9); }
         }
-        .anim-badge {
-            animation: bounceSlow 1.5s infinite ease-in-out, glowPulse 2s infinite ease-in-out;
+        .animate-celebration {
+            animation: popUp 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards, glow 2s infinite ease-in-out;
         }
     </style>
 </head>
@@ -56,29 +57,18 @@
         <!-- SONUÇ EKRANI -->
         {% if sonuc %}
 
-        <!-- Derece Kontrolü (Jinja Namespace) -->
-        {% set ns = namespace(top_rank=none) %}
-        {% for sinav in sonuc.sinavlar %}
-            {% if sinav.derece %}
-                {% set temiz_derece = sinav.derece|string|replace('.', '')|trim %}
-                {% if temiz_derece in ['1', '2', '3'] and not ns.top_rank %}
-                    {% set ns.top_rank = temiz_derece %}
-                {% endif %}
-            {% endif %}
-        {% endfor %}
-
-        <!-- İLK 3'E GİRENLER İÇİN EN TEPEDE GÖZ ALICI KUTLAMA ŞÖLENİ BÖLÜMÜ -->
-        {% if ns.top_rank %}
-        <div class="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 p-6 rounded-3xl shadow-xl text-slate-900 text-center space-y-4 border-4 border-white anim-badge">
-            <div class="inline-flex items-center justify-center w-20 h-20 bg-white rounded-full shadow-lg text-4xl font-black text-amber-600 border-4 border-amber-200">
-                {{ ns.top_rank }}.
+        <!-- İLK 3'E GİRENLER İÇİN ANİMASYONLU KUTLAMA ALANI -->
+        {% if en_iyi_derece %}
+        <div class="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 p-6 md:p-8 rounded-3xl shadow-2xl text-slate-900 text-center space-y-4 border-4 border-white animate-celebration">
+            <div class="inline-flex items-center justify-center w-24 h-24 bg-white rounded-full shadow-xl text-5xl font-black text-amber-600 border-4 border-amber-200">
+                {{ en_iyi_derece }}.
             </div>
             <div class="space-y-1">
-                <span class="bg-slate-900 text-amber-300 text-[11px] font-black uppercase px-3 py-1 rounded-full tracking-widest shadow">
+                <span class="bg-slate-900 text-amber-300 text-xs font-black uppercase px-4 py-1.5 rounded-full tracking-widest shadow">
                     🏆 SINIF İÇİ ÜSTÜN BAŞARI
                 </span>
-                <h2 class="text-2xl font-black tracking-tight text-slate-900 mt-1">TEBRİKLER!</h2>
-                <p class="text-sm font-bold text-slate-900 max-w-md mx-auto leading-relaxed">
+                <h2 class="text-3xl font-black tracking-tight text-slate-900 mt-1">TEBRİKLER!</h2>
+                <p class="text-sm font-bold text-slate-900 max-w-md mx-auto leading-relaxed pt-1">
                     🎉 "Tebrikler! Sınıf içinde gösterdiğin bu üstün başarıdan dolayı seni kutluyorum."
                 </p>
             </div>
@@ -149,7 +139,7 @@
     </main>
 
     <footer class="text-center py-4 text-xs text-slate-400 border-t border-slate-200 mt-8">
-        © 2026 Büşra Güngör Öğrenci Sınav-Karne Sistemi • Tüm hakları saklıdır.
+        © 2026 Büşra Güngör Öğrenci Sınav ve Karne Sistemi • Tüm hakları saklıdır.
     </footer>
 
 </body>

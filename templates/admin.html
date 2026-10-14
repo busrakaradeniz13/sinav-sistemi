@@ -159,7 +159,7 @@
             <!-- TABLO: KAYITLI ÖĞRENCİ LİSTESİ -->
             <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
                 <div class="flex justify-between items-center border-b pb-3">
-                    <h2 class="text-base font-bold text-slate-800">Kayıtlı Öğrenci ve Sınav Listesi</h2>
+                    <h2 class="text-base font-bold text-slate-800">Kayıtlı Öğrenci ve Detaylı Sınav Listesi</h2>
                     <span class="text-xs font-bold bg-slate-100 px-3 py-1 rounded-full text-slate-600">Toplam {{ veriler|length }} Öğrenci</span>
                 </div>
 
@@ -167,34 +167,45 @@
                     <table class="w-full text-left text-xs">
                         <thead>
                             <tr class="bg-slate-50 text-slate-500 border-b">
-                                <th class="p-2.5">No</th>
-                                <th class="p-2.5">Ad Soyad</th>
-                                <th class="p-2.5">Sınav Geçmişi</th>
-                                <th class="p-2.5 text-right">İşlem</th>
+                                <th class="p-2.5 w-16">No</th>
+                                <th class="p-2.5 w-32">Ad Soyad</th>
+                                <th class="p-2.5">Sınav Geçmişi (D, Y, B, Puan & Sıralama)</th>
+                                <th class="p-2.5 text-right w-16">İşlem</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
                             {% for no, bilgi in veriler.items() %}
                             <tr class="hover:bg-slate-50/80 transition">
-                                <td class="p-2.5 font-bold text-indigo-600">{{ no }}</td>
-                                <td class="p-2.5 font-bold text-slate-800">{{ bilgi.ad }}</td>
-                                <td class="p-2.5 space-y-1">
+                                <td class="p-2.5 font-bold text-indigo-600 align-top pt-3">{{ no }}</td>
+                                <td class="p-2.5 font-bold text-slate-800 align-top pt-3">{{ bilgi.ad }}</td>
+                                <td class="p-2.5 space-y-1.5">
                                     {% for s in bilgi.sinavlar %}
-                                    <div class="flex items-center gap-2 text-[11px] bg-slate-100 px-2 py-1 rounded-md border border-slate-200/60 justify-between">
-                                        <div>
-                                            <span class="font-semibold text-slate-700">{{ s.sinav }}:</span>
-                                            <span class="font-extrabold text-indigo-700 ml-1">{{ s.puan }} Puan</span>
+                                    <div class="flex flex-wrap items-center gap-2 text-[11px] bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-200 justify-between">
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <span class="font-bold text-slate-800">{{ s.sinav }}:</span>
+                                            
+                                            <!-- DOĞRU / YANLIŞ / BOŞ BİLGİSİ -->
+                                            <span class="bg-emerald-50 text-emerald-700 font-semibold px-1.5 py-0.5 rounded border border-emerald-200">D: {{ s.dogru }}</span>
+                                            <span class="bg-rose-50 text-rose-700 font-semibold px-1.5 py-0.5 rounded border border-rose-200">Y: {{ s.yanlis }}</span>
+                                            <span class="bg-slate-100 text-slate-600 font-semibold px-1.5 py-0.5 rounded border border-slate-200">B: {{ s.bos }}</span>
+                                            
+                                            <!-- PUAN BİLGİSİ -->
+                                            <span class="bg-indigo-50 text-indigo-700 font-extrabold px-2 py-0.5 rounded border border-indigo-100">
+                                                {{ s.puan }} Puan
+                                            </span>
+
+                                            <!-- SINIF DERECESİ / SIRALAMA BİLGİSİ -->
                                             {% if s.derece %}
-                                            <span class="bg-amber-100 text-amber-800 font-extrabold px-1.5 py-0.5 rounded text-[10px] ml-1">
-                                                🏆 {{ s.derece }}.
+                                            <span class="bg-amber-100 text-amber-900 font-extrabold px-2 py-0.5 rounded border border-amber-300 shadow-2xs">
+                                                🏆 {{ s.derece }}. Sıra
                                             </span>
                                             {% endif %}
                                         </div>
-                                        <a href="/admin/sinav-sil/{{ no }}/{{ s.sinav }}" onclick="return confirm('Bu sınav sonucunu silmek istediğinize emin misiniz?')" class="text-rose-500 hover:text-rose-700 font-bold ml-2">×</a>
+                                        <a href="/admin/sinav-sil/{{ no }}/{{ s.sinav }}" onclick="return confirm('Bu sınav sonucunu silmek istediğinize emin misiniz?')" class="text-rose-500 hover:text-rose-700 font-bold px-1" title="Sınavı Sil">×</a>
                                     </div>
                                     {% endfor %}
                                 </td>
-                                <td class="p-2.5 text-right">
+                                <td class="p-2.5 text-right align-top pt-3">
                                     <a href="/admin/ogrenci-sil/{{ no }}" onclick="return confirm('Öğrenciyi ve TÜM sınavlarını silmek istediğinize emin misiniz?')" class="text-rose-600 hover:underline font-bold">Sil</a>
                                 </td>
                             </tr>
@@ -212,9 +223,8 @@
 
     </main>
 
-    <!-- SAYFA YÜKLENİRKEN KAYITLI ÖĞRENCİLERİ DOĞRUDAN HAFIZAYA ALAN VE ANINDA BULAN ÇİFT AŞAMALI SCRIPT -->
+    <!-- ANINDA OTOMATİK İSİM GETİRME SCRIPT'İ -->
     <script>
-        // Sayfadaki tüm öğrencileri JavaScript hafızasına doğrudan aktarıyoruz (Ağ gecikmesini sıfırlar)
         const ogrenciListesi = {
             {% for no, bilgi in veriler.items() %}
             "{{ no }}": "{{ bilgi.ad }}",
@@ -230,11 +240,9 @@
             const no = noInput.value.trim();
 
             if (no in ogrenciListesi) {
-                // 1. Aşama: Sayfadaki yerel hafızadan milisaniye hızında getir
                 adInput.value = ogrenciListesi[no];
                 if (bilgiSpan) bilgiSpan.classList.remove('hidden');
             } else if (no.length > 0) {
-                // 2. Aşama: Yerel hafızada bulamazsa arka plan API'sine sor
                 fetch('/admin/ogrenci-ara/' + encodeURIComponent(no))
                     .then(response => response.json())
                     .then(data => {
@@ -252,7 +260,6 @@
         }
 
         if (noInput) {
-            // Yazarken, tuş bırakıldığında veya kutudan çıkıldığında anında tetiklenir
             noInput.addEventListener('input', isimAra);
             noInput.addEventListener('keyup', isimAra);
             noInput.addEventListener('change', isimAra);

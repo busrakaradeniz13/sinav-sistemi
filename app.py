@@ -150,11 +150,15 @@ def veli_sorgula():
     if not ogrenci_no:
       hata = "Lütfen geçerli bir öğrenci numarası giriniz."
     elif ogrenci_no in sinav_verileri:
-      sonuc = sinav_verileri[ogrenci_no]
-      sinavlar = sonuc.get("sinavlar", [])
-      # SADECE EN SON EKLENEN (LİSTEDEKİ EN SON) SINAVA BAKILIYOR
-      if sinavlar:
-        en_son_sinav = sinavlar[-1]
+      ham_veri = sinav_verileri[ogrenci_no]
+
+      # Sınavları kopyalayıp en son eklenen en başta olacak şekilde ters çeviriyoruz (Görsel ve kontrol için)
+      ters_sinavlar = list(reversed(ham_veri.get("sinavlar", [])))
+      sonuc = {"ad": ham_veri["ad"], "sinavlar": ters_sinavlar}
+
+      # En son eklenen (listenin en başındaki) sınava göre kutlama kontrolü
+      if ters_sinavlar:
+        en_son_sinav = ters_sinavlar[0]
         d_val = (
             str(en_son_sinav.get("derece", "")).replace(".", "").strip().lower()
         )

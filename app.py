@@ -193,65 +193,82 @@ def admin_panel():
   )
 
 
-@app.route("/admin/ogrenci-ara/<ogrenci_no>")
-def ogrenci_ara(ogrenci_no):
-  """Numarası girilen öğrencinin ismini otomatik getiren API"""
-  if ogrenci_no in sinav_verileri:
-    return jsonify({"bulundu": True, "ad": sinav_verileri[ogrenci_no]["ad"]})
-  return jsonify({"bulundu": False})
-
-
-@app.route("/admin/cikis")
-def admin_cikis():
-  session.clear()
-  return redirect(url_for("admin_panel"))
-
-
-@app.route("/admin/kaydet", methods=["POST"])
-def ogrenci_kaydet():
+@app.route("/admin/yeni-ogrenci-ekle", methods=["POST"])
+def yeni_ogrenci_ekle():
   if not session.get("admin_logged_in"):
     return redirect(url_for("admin_panel"))
 
   ogrenci_no = request.form.get("ogrenci_no", "").strip()
   ad = request.form.get("ad", "").strip()
-  sinav_adi = request.form.get("sinav", "Genel Sınav").strip()
-  derece = request.form.get("derece", "").strip()
-
-  try:
-    dogru = int(request.form.get("dogru", 0))
-    yanlis = int(request.form.get("yanlis", 0))
-    bos = int(request.form.get("bos", 0))
-    puan = int(request.form.get("puan", 0))
-  except ValueError:
-    dogru, yanlis, bos, puan = 0, 0, 0, 0
-
-  yeni_sinav = {
-      "sinav": sinav_adi,
-      "dogru": dogru,
-      "yanlis": yanlis,
-      "bos": bos,
-      "puan": puan,
-      "derece": derece,
-  }
 
   if ogrenci_no and ad:
     if ogrenci_no not in sinav_verileri:
       sinav_verileri[ogrenci_no] = {"ad": ad, "sinavlar": []}
-    sinav_verileri[ogrenci_no]["ad"] = ad
-    mevcut = sinav_verileri[ogrenci_no]["sinavlar"]
-    guncellendi = False
+    else:
+      sinav_verileri[ogrenci_no]["ad"] = ad
+    verileri_excele_yedekle()
+    flash(f"Öğrenci kaydedildi: {ad} ({ogrenci_no})", "success")
+  else:
+    flash("Öğrenci numarası ve adı boş bırakılamaz!", "error")
 
+  return redirect(url_for("admin_panel"))
+
+
+@app.route("/admin/toplu-kaydet", methods=["POST"])
+def toplu_kaydet():
+  if not session.get("admin_logged_in"):
+    return redirect(url_for("admin_panel"))
+
+  sinav_adi = request.form.get("sinav_adi", "").strip()
+  if not sinav_adi:
+    flash("Lütfen geçerli bir ders / sınav adı giriniz!", "error")
+    return redirect(url_for("admin_panel"))
+
+  # Formdan gelen verileri öğrenci numaralarına göre gruplayıp işleyelim
+  # Form input isimleri: dogru_101, yanlis_101, bos_101, puan_101, derece_101 şeklinde olacak
+  guncellenen_sayisi = 0
+
+  for no in sinav_verileri.keys():
+    d_val = request.form.get(f"dogru_{no}", "0")
+    y_val = request.form.get(f"yanlis_{no}", "0")
+    b_val = request.form.get(f"bos_{no}", "0")
+    p_val = request.form.get(f"puan_{no}", "0")
+    derece = request.form.get(f"derece_{no}", "").strip()
+
+    try:
+      dogru = int(d_val)
+      yanlis = int(y_val)
+      bos = int(b_val)
+      puan = int(p_val)
+    except ValueError:
+      dogru, yanlis, bos, puan = 0, 0, 0, 0
+
+    yeni_sinav = {
+        "sinav": sinav_adi,
+        "dogru": dogru,
+        "yanlis": yanlis,
+        "bos": bos,
+        "puan": puan,
+        "derece": derece,
+    }
+
+    mevcut = sinav_verileri[no]["sinavlar"]
+    bulundu = False
     for s in mevcut:
       if s["sinav"].lower() == sinav_adi.lower():
         s.update(yeni_sinav)
-        guncellendi = True
+        bulundu = True
         break
-    if not guncellendi:
+    if not bulundu:
       mevcut.append(yeni_sinav)
+    guncellenen_sayisi += 1
 
-    verileri_excele_yedekle()
-    flash(f"Başarılı: {ad} - {sinav_adi} kaydedildi.", "success")
-
+  verileri_excele_yedekle()
+  flash(
+      f"'{sinav_adi}' için {guncellenen_sayisi} öğrencinin notları başarıyla"
+      " kaydedildi!",
+      "success",
+  )
   return redirect(url_for("admin_panel"))
 
 

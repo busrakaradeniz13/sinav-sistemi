@@ -51,7 +51,7 @@ sinav_verileri = {
 }
 
 
-# --- SİSTEM AÇILDIĞINDA ARŞİVDEKİ EXCELİ OTOMATİK OKU ---
+# --- SİSTEM AÇILDIĞINDA ARŞİVDEKİ EXCELİ OKU ---
 def yedekten_verileri_yukle():
   global sinav_verileri
   if os.path.exists(YEDEK_DOSYA_YOLU):
@@ -118,16 +118,14 @@ def yedekten_verileri_yukle():
 
       if gecici_veri:
         sinav_verileri = gecici_veri
-        print("Arşivdeki Excel'den veriler başarıyla yüklendi.")
     except Exception as e:
-      print("Arşiv dosyası okunurken hata:", e)
+      print("Arşiv okunurken hata:", e)
 
 
-# Uygulama başlarken arşivi kontrol et
 yedekten_verileri_yukle()
 
 
-# --- YAPILAN HER DEĞİŞİKLİĞİ ANINDA ARŞİVDEKİ EXCELE KAYDET ---
+# --- VERİLERİ EXCELE KAYDETME FONKSİYONU ---
 def verileri_excele_yedekle():
   try:
     satirlar = []
@@ -147,7 +145,7 @@ def verileri_excele_yedekle():
       df = pd.DataFrame(satirlar)
       df.to_excel(YEDEK_DOSYA_YOLU, index=False)
   except Exception as e:
-    print("Arşivleme hatası:", e)
+    print("Yedekleme hatası:", e)
 
 
 @app.route("/", methods=["GET", "POST"])
@@ -191,7 +189,7 @@ def admin_cikis():
   return redirect(url_for("admin_panel"))
 
 
-# --- TEK TEK KAYIT (ANINDA ARŞİVE İŞLENİR) ---
+# --- KAYDETME İŞLEMİNDEN SONRA OTOMATİK EXCEL İNDİR ---
 @app.route("/admin/kaydet", methods=["POST"])
 def ogrenci_kaydet():
   if not session.get("admin_logged_in"):
@@ -228,9 +226,15 @@ def ogrenci_kaydet():
     if not guncellendi:
       mevcut.append(yeni_sinav)
 
-    # Değişikliği anında arşive kaydet
+    # Sunucuya kaydet ve güncel Excel'i öğretmenin bilgisayarına otomatik indir
     verileri_excele_yedekle()
-    flash(f"Başarılı: {ad} - {sinav_adi} kaydedildi ve arşive işlendi.", "success")
+    if os.path.exists(YEDEX_DOSYA_YOLU if 'YEDEX_DOSYA_YOLU' in globals() else YEDEK_DOSYA_YOLU):
+      return send_file(
+          YEDEK_DOSYA_YOLU,
+          as_attachment=True,
+          download_name="guncel_sinav_listesi.xlsx",
+      )
+
   return redirect(url_for("admin_panel"))
 
 
@@ -241,7 +245,12 @@ def ogrenci_sil(ogrenci_no):
   if ogrenci_no in sinav_verileri:
     del sinav_verileri[ogrenci_no]
     verileri_excele_yedekle()
-    flash("Öğrenci silindi ve arşiv güncellendi.", "info")
+    # Silme işleminden sonra da güncel Excel'i indir
+    return send_file(
+        YEDEK_DOSYA_YOLU,
+        as_attachment=True,
+        download_name="guncel_sinav_listesi.xlsx",
+    )
   return redirect(url_for("admin_panel"))
 
 
@@ -255,11 +264,17 @@ def sinav_sil(ogrenci_no, sinav_adi):
         s for s in sinavlar if s["sinav"] != sinav_adi
     ]
     verileri_excele_yedekle()
-    flash("Sınav sonucu silindi ve arşiv güncellendi.", "info")
-  return redirect(url_for("admin_panel"))
+    # Sınav silme işleminden sonra güncel Excel'i indir
+    return send_file(
+        YEDEK_DOSYA_YOLU,
+        as_attachment=True,
+        download_name="guncel_sinav_listesi.xlsx",
+    )
+  return redirect(url_for("admin_payload")) if False else redirect(
+      url_for("admin_panel")
+  )
 
 
-# --- TOPLU EXCEL YÜKLEME (ANINDA ARŞİVE İŞLENİR) ---
 @app.route("/admin/excel-yukle", methods=["POST"])
 def excel_yukle():
   if not session.get("admin_logged_in"):
@@ -268,76 +283,13 @@ def excel_yukle():
   dosya = request.files.get("excel_dosya")
   if dosya:
     try:
-      if dosya.filename.endswith(".csv"):
-        df = pd.read_csv(dosya)
-      else:
-        df = pd.read_excel(dosya)
-
-      df.columns = [str(col).strip().lower() for col in df.columns]
-
-      for _, row in df.iterrows():
-        no = str(
-            row.get("ogrenci_no", row.get("no", row.get("okul_no", "0")))
-        ).strip()
-        ad = str(row.get("ad", row.get("ad_soyad", "İsimsiz"))).strip()
-        sinav_adi = str(
-            row.get("sinav", row.get("sinav_adi", "Genel Sınav"))
-        ).strip()
-
-        try:
-          dogru = int(
-              row.get("dogru", row.get("d", 0))
-              if pd.notna(row.get("dogru", row.get("d", 0)))
-              else 0
-          )
-          yanlis = int(
-              row.get("yanlis", row.get("y", 0))
-              if pd.notna(row.get("yanlis", row.get("y", 0)))
-              else 0
-          )
-          bos = int(
-              row.get("bos", row.get("b", 0))
-              if pd.notna(row.get("bos", row.get("b", 0)))
-              else 0
-          )
-          puan = int(
-              row.get("puan", row.get("not", 0))
-              if pd.notna(row.get("puan", row.get("not", 0)))
-              else 0
-          )
-        except:
-          dogru, yanlis, bos, puan = 0, 0, 0, 0
-
-        yeni_sinav = {
-            "sinav": sinav_adi,
-            "dogru": dogru,
-            "yanlis": yanlis,
-            "bos": bos,
-            "puan": puan,
-        }
-
-        if no and no != "nan":
-          if no not in sinav_verileri:
-            sinav_verileri[no] = {"ad": ad, "sinavlar": []}
-          sinav_verileri[no]["ad"] = ad
-          mevcut = sinav_verileri[no]["sinavlar"]
-
-          eklendi = False
-          for s in mevcut:
-            if s["sinav"].lower() == sinav_adi.lower():
-              s.update(yeni_sinav)
-              eklendi = True
-              break
-          if not eklendi:
-            mevcut.append(yeni_sinav)
-
-      # Yüklenen tüm verileri anında arşive kaydet
-      verileri_excele_yedekle()
-      flash(
-          "Excel başarıyla yüklendi ve anında arşive kaydedildi!", "success"
-      )
+      # Dışarıdan yüklenen orijinal Excel'i direkt sunucu arşivi olarak kaydet
+      dosya.seek(0)
+      dosya.save(YEDEK_DOSYA_YOLU)
+      yedekten_verileri_yukle()
+      flash("Excel başarıyla yüklendi ve arşivlendi!", "success")
     except Exception as e:
-      flash(f"Excel okunurken hata oluştu: {str(e)}", "error")
+      flash(f"Excel yüklenirken hata: {str(e)}", "error")
 
   return redirect(url_for("admin_panel"))
 

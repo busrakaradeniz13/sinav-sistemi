@@ -3,6 +3,7 @@ import os
 from flask import (
     Flask,
     flash,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -191,7 +192,6 @@ def admin_panel():
         "admin.html", veriler=sinav_verileri, giris_yapildi=False, son_sinav=""
     )
 
-  # Oturumda hafızada tutulan son sınav adını şablona gönderiyoruz
   son_sinav = session.get("son_sinav_adi", "")
   return render_template(
       "admin.html",
@@ -199,6 +199,15 @@ def admin_panel():
       giris_yapildi=True,
       son_sinav=son_sinav,
   )
+
+
+@app.route("/admin/ogrenci-ara/<ogrenci_no>")
+def ogrenci_ara(ogrenci_no):
+  if not session.get("admin_logged_in"):
+    return jsonify({"bulundu": False})
+  if ogrenci_no in sinav_verileri:
+    return jsonify({"bulundu": True, "ad": sinav_verileri[ogrenci_no]["ad"]})
+  return jsonify({"bulundu": False})
 
 
 @app.route("/admin/cikis")
@@ -217,7 +226,6 @@ def ogrenci_kaydet():
   sinav_adi = request.form.get("sinav", "Genel Sınav").strip()
   derece = request.form.get("derece", "").strip()
 
-  # En son girilen sınav adını hafızada sakla
   if sinav_adi:
     session["son_sinav_adi"] = sinav_adi
 

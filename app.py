@@ -25,7 +25,6 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 def db_baglantisi():
     """PostgreSQL (Neon) bulut veritabanına güvenli bağlanır."""
     if DATABASE_URL:
-        # sslmode=require ekleyerek bulut bağlantısının kopmasını engelleriz
         url = DATABASE_URL
         if "sslmode" not in url:
             url += "?sslmode=require" if "?" not in url else "&sslmode=require"
@@ -35,7 +34,7 @@ def db_baglantisi():
         raise Exception("DATABASE_URL ortam değişkeni bulunamadı!")
 
 def veritabani_kur():
-    """Bulut veritabanında tabloları otomatik oluşturur."""
+    """Bulut veritabanında tabloları ve sayaç tablosunu otomatik oluşturur."""
     try:
         conn = db_baglantisi()
         cursor = conn.cursor()
@@ -62,15 +61,70 @@ def veritabani_kur():
             )
         """)
 
+        # Ziyaret ve Sorgulama Sayacı İçin Tablo
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS istatistikler (
+                id INTEGER PRIMARY KEY,
+                toplam_ziyaret INTEGER DEFAULT 0,
+                toplam_sorgu INTEGER DEFAULT 0
+            )
+        """)
+
+        # Eğer ilk defa kuruluyorsa başlangıç satırını ekle
+        cursor.execute("""
+            INSERT INTO istatistikler (id, toplam_ziyaret, toplam_sorgu)
+            VALUES (1, 0, 0)
+            ON CONFLICT (id) DO NOTHING
+        """)
+
         conn.commit()
         cursor.close()
         conn.close()
-        print("Bulut veritabanı tabloları başarıyla hazırlandı.")
+        print("Bulut veritabanı ve sayaç tabloları başarıyla hazırlandı.")
     except Exception as e:
         print(f"Veritabanı kurulum hatası: {e}")
 
 # Uygulama başlarken tabloları kur
 veritabani_kur()
+
+def istatistikleri_getir_ve_arttir(tip="ziyaret"):
+    """Ziyaret veya sorgu sayısını 1 artırır ve güncel sayıları döndürür."""
+    try:
+        conn = db_baglantisi()
+        cursor = conn.cursor()
+
+        if tip == "ziyaret":
+            cursor.execute("UPDATE istatistikler SET toplam_ziyaret = toplam_ziyaret + 1 WHERE id = 1")
+        elif tip == "sorgu":
+            cursor.execute("UPDATE istatistikler SET toplam_sorgu = toplam_sorgu + 1 WHERE id = 1")
+
+        conn.commit()
+
+        cursor.execute("SELECT toplam_ziyaret, toplam_sorgu FROM istatistikler WHERE id = 1")
+        res = cursor.fetchone()
+        cursor.close()
+        conn.close()
+
+        if res:
+            return res["toplam_ziyaret"], res["toplam_sorgu"]
+    except Exception as e:
+        print(f"İstatistik hatası: {e}")
+    return 0, 0
+
+def istatistikleri_oku():
+    """Artırmadan sadece mevcut sayaçları okur (Admin paneli için)."""
+    try:
+        conn = db_baglantisi()
+        cursor = conn.cursor()
+        cursor.execute("SELECT toplam_ziyaret, toplam_sorgu FROM istatistikler WHERE id = 1")
+        res = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        if res:
+            return res["toplam_ziyaret"], res["toplam_sorgu"]
+    except:
+        pass
+    return 0, 0
 
 def sinav_verilerini_getir():
     try:
@@ -117,7 +171,14 @@ def veli_sorgula():
     en_son_derece = None
     sinav_verileri = sinav_verilerini_getir()
 
+    # Sayfa ilk açıldığında (GET isteği) toplam ziyaret sayısını 1 artır
+    if request.method == "GET":
+        istatistikleri_getir_ve_arttir("ziyaret")
+
     if request.method == "POST":
+        # Her sorgulama butonuna basıldığında (POST isteği) sorgu sayısını 1 artır
+        istatistikleri_getir_ve_arttir("sorgu")
+
         ogrenci_no = request.form.get("ogrenci_no", "").strip()
         if not ogrenci_no:
             hata = "Lütfen geçerli bir öğrenci numarası giriniz."
@@ -147,6 +208,7 @@ def veli_sorgula():
 @app.route("/admin", methods=["GET", "POST"])
 def admin_panel():
     sinav_verileri = sinav_verilerini_getir()
+    toplam_ziyaret, toplam_sorgu = istatistikleri_oku()
 
     if request.method == "POST":
         sifre = request.form.get("sifre", "").strip()
@@ -159,11 +221,14 @@ def admin_panel():
                 veriler=sinav_verileri,
                 giris_yapildi=False,
                 son_sinav="",
+                toplam_ziyaret=toplam_ziyaret,
+                toplam_sorgu=toplam_sorgu,
             )
 
     if not session.get("admin_logged_in"):
         return render_template(
-            "admin.html", veriler=sinav_verileri, giris_yapildi=False, son_sinav=""
+            "admin.html", veriler=sinav_verileri, giris_yapildi=False, son_sinav="",
+            toplam_ziyaret=toplam_ziyaret, toplam_sorgu=toplam_sorgu
         )
 
     son_sinav = session.get("son_sinav_adi", "")
@@ -172,6 +237,8 @@ def admin_panel():
         veriler=sinav_verileri,
         giris_yapildi=True,
         son_sinav=son_sinav,
+        toplam_ziyaret=toplam_ziyaret,
+        toplam_sorgu=toplam_sorgu,
     )
 
 

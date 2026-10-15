@@ -18,9 +18,9 @@ import pandas as pd
 app = Flask(__name__)
 app.secret_key = "ogretmen_cok_gizli_guvenlik_anahtari_98765"
 
-ADMIN_PASSWORD = "1234"
+ADMIN_PASSWORD = "15698"  # İstediğiniz yeni admin şifresi
 
-# Render'daki Neon PostgreSQL bağlantı adresini alır (Eğer yoksa yerel SQLite/yedek uyarısı verir ama bulutta DATABASE_URL çalışır)
+# Render'daki Neon PostgreSQL bağlantı adresini alır
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 def db_baglantisi():
@@ -362,7 +362,7 @@ def excel_yukle():
 @app.route("/admin/excel-indir")
 def excel_indir():
     if not session.get("admin_logged_in"):
-        return redirect(url_for("admin_panel"))
+        return redirect(url_for("admin_path") if 'admin_path' in globals() else url_for("admin_panel"))
 
     try:
         sinav_verileri = sinav_verilerini_getir()

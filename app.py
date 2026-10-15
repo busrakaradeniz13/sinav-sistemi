@@ -1,6 +1,7 @@
 import io
 import os
-import sqlite3
+import psycopg2
+from psycopg2.extras import RealDictCursor
 from flask import (
     Flask,
     flash,
@@ -18,486 +19,386 @@ app = Flask(__name__)
 app.secret_key = "ogretmen_cok_gizli_guvenlik_anahtari_98765"
 
 ADMIN_PASSWORD = "1234"
-DB_DOSYA_YOLU = "notlar.db"
-YEDEK_EXCEL_YOLU = "otomatik_yedek.xlsx"
 
+# Render'daki Neon PostgreSQL bağlantı adresini alır (Eğer yoksa yerel SQLite/yedek uyarısı verir ama bulutta DATABASE_URL çalışır)
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
 def db_baglantisi():
-  conn = sqlite3.connect(DB_DOSYA_YOLU)
-  conn.row_factory = sqlite3.Row
-  return conn
-
+    """PostgreSQL (Neon) bulut veritabanına bağlanır."""
+    if DATABASE_URL:
+        conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+        return conn
+    else:
+        raise Exception("DATABASE_URL ortam değişkeni bulunamadı! Lütfen Render Environment ayarlarına ekleyin.")
 
 def veritabani_kur():
-  """Veritabanını kurar ve sıfırlanmışsa otomatik yedekten geri yükler."""
-  conn = db_baglantisi()
-  cursor = conn.cursor()
+    """Bulut veritabanında tabloları otomatik oluşturur."""
+    try:
+        conn = db_baglantisi()
+        cursor = conn.cursor()
 
-  cursor.execute("""
-        CREATE TABLE IF NOT EXISTS ogrenciler (
-            ogrenci_no TEXT PRIMARY KEY,
-            ad TEXT NOT NULL
-        )
-    """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS ogrenciler (
+                ogrenci_no TEXT PRIMARY KEY,
+                ad TEXT NOT NULL
+            )
+        """)
 
-  cursor.execute("""
-        CREATE TABLE IF NOT EXISTS sinavlar (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            ogrenci_no TEXT NOT NULL,
-            sinav TEXT NOT NULL,
-            dogru INTEGER DEFAULT 0,
-            yanlis INTEGER DEFAULT 0,
-            bos INTEGER DEFAULT 0,
-            puan INTEGER DEFAULT 0,
-            derece TEXT DEFAULT '',
-            FOREIGN KEY (ogrenci_no) REFERENCES ogrenciler (ogrenci_no) ON DELETE CASCADE,
-            UNIQUE(ogrenci_no, sinav)
-        )
-    """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS sinavlar (
+                id SERIAL PRIMARY KEY,
+                ogrenci_no TEXT NOT NULL,
+                sinav TEXT NOT NULL,
+                dogru INTEGER DEFAULT 0,
+                yanlis INTEGER DEFAULT 0,
+                bos INTEGER DEFAULT 0,
+                puan INTEGER DEFAULT 0,
+                derece TEXT DEFAULT '',
+                FOREIGN KEY (ogrenci_no) REFERENCES ogrenciler (ogrenci_no) ON DELETE CASCADE,
+                UNIQUE(ogrenci_no, sinav)
+            )
+        """)
 
-  conn.commit()
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print("Bulut veritabanı tabloları başarıyla hazırlandı.")
+    except Exception as e:
+        print(f"Veritabanı kurulum hatası: {e}")
 
-  # Veritabanı boş mu kontrol et
-  cursor.execute("SELECT COUNT(*) as sayi FROM ogrenciler")
-  ogrenci_sayisi = cursor.fetchone()["sayi"]
-  conn.close()
+# Uygulama başlarken bulut veritabanı tablolarını kur
+veritabani_kur()
 
-  # Eğer veritabanı sıfırlanmışsa ve otomatik yedek dosyası varsa GERİ YÜKLE
-  if ogrenci_sayisi == 0 and os.path.exists(YEDEK_EXCEL_YOLU):
-    excelden_otomatik_kur(YEDEK_EXCEL_YOLU)
-
-
-def excel_otomatik_senkronize():
-  """Veritabanındaki son durumu otomatik yedek Excel dosyasına yazar."""
-  try:
-    sinav_verileri = sinav_verilerini_getir()
-    satirlar = []
-
-    for no, bilgi in sinav_verileri.items():
-      ad = bilgi["ad"]
-      for s in bilgi["sinavlar"]:
-        satirlar.append({
-            "ogrenci_no": no,
-            "ad": ad,
-            "sinav": s["sinav"],
-            "dogru": s["dogru"],
-            "yanlis": s["yanlis"],
-            "bos": s["bos"],
-            "puan": s["puan"],
-            "derece": s.get("derece", ""),
-        })
-
-    if satirlar:
-      df = pd.DataFrame(satirlar)
-      df.to_excel(YEDEK_EXCEL_YOLU, index=False)
-  except Exception as e:
-    print(f"Otomatik yedek oluşturma hatası: {e}")
-
-
-def excelden_otomatik_kur(dosya_yolu):
-  """Sıfırlanma sonrası Excel'den otomatik geri aktarma yapar."""
-  try:
-    df = pd.read_excel(dosya_yolu)
-    df.columns = [str(col).strip().lower() for col in df.columns]
-
+def sinav_verilerini_getir():
     conn = db_baglantisi()
     cursor = conn.cursor()
 
-    for _, row in df.iterrows():
-      no = str(
-          row.get("ogrenci_no", row.get("no", row.get("okul_no", "0")))
-      ).strip()
-      ad = str(row.get("ad", row.get("ad_soyad", "İsimsiz"))).strip()
-      sinav_adi = str(
-          row.get("sinav", row.get("sinav_adi", "Genel Sınav"))
-      ).strip()
+    cursor.execute("SELECT * FROM ogrenciler")
+    ogrenci_satirlari = cursor.fetchall()
 
-      try:
-        dogru = int(row.get("dogru", 0) if pd.notna(row.get("dogru", 0)) else 0)
-        yanlis = int(
-            row.get("yanlis", 0) if pd.notna(row.get("yanlis", 0)) else 0
-        )
-        bos = int(row.get("bos", 0) if pd.notna(row.get("bos", 0)) else 0)
-        puan = int(row.get("puan", 0) if pd.notna(row.get("puan", 0)) else 0)
-        derece = str(
-            row.get("derece", "") if pd.notna(row.get("derece", "")) else ""
-        ).strip()
-        if derece == "nan":
-          derece = ""
-      except:
-        dogru, yanlis, bos, puan, derece = 0, 0, 0, 0, ""
-
-      if no and no != "nan":
-        cursor.execute(
-            """
-                    INSERT INTO ogrenciler (ogrenci_no, ad) VALUES (?, ?)
-                    ON CONFLICT(ogrenci_no) DO UPDATE SET ad = excluded.ad
-                """,
-            (no, ad),
-        )
+    veriler = {}
+    for ogrenci in ogrenci_satirlari:
+        no = ogrenci["ogrenci_no"]
+        ad = ogrenci["ad"]
 
         cursor.execute(
-            """
-                    INSERT INTO sinavlar (ogrenci_no, sinav, dogru, yanlis, bos, puan, derece)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(ogrenci_no, sinav) DO UPDATE SET
-                        dogru = excluded.dogru,
-                        yanlis = excluded.yanlis,
-                        bos = excluded.bos,
-                        puan = excluded.puan,
-                        derece = excluded.derece
-                """,
-            (no, sinav_adi, dogru, yanlis, bos, puan, derece),
+            "SELECT * FROM sinavlar WHERE ogrenci_no = %s ORDER BY id ASC", (no,)
         )
+        sinav_satirlari = cursor.fetchall()
 
-    conn.commit()
+        sinavlar = []
+        for s in sinav_satirlari:
+            sinavlar.append({
+                "sinav": s["sinav"],
+                "dogru": s["dogru"],
+                "yanlis": s["yanlis"],
+                "bos": s["bos"],
+                "puan": s["puan"],
+                "derece": s["derece"] if s["derece"] else "",
+            })
+
+        veriler[no] = {"ad": ad, "sinavlar": sinavlar}
+
+    cursor.close()
     conn.close()
-    print("Sıfırlanan veritabanı otomatik yedekten geri yüklendi!")
-  except Exception as e:
-    print(f"Otomatik kurtarma hatası: {e}")
-
-
-# Uygulama başlarken veritabanı ve kurtarma kontrolü
-veritabani_kur()
-
-
-def sinav_verilerini_getir():
-  conn = db_baglantisi()
-  cursor = conn.cursor()
-
-  cursor.execute("SELECT * FROM ogrenciler")
-  ogrenci_satirlari = cursor.fetchall()
-
-  veriler = {}
-  for ogrenci in ogrenci_satirlari:
-    no = ogrenci["ogrenci_no"]
-    ad = ogrenci["ad"]
-
-    cursor.execute(
-        "SELECT * FROM sinavlar WHERE ogrenci_no = ? ORDER BY id ASC", (no,)
-    )
-    sinav_satirlari = cursor.fetchall()
-
-    sinavlar = []
-    for s in sinav_satirlari:
-      sinavlar.append({
-          "sinav": s["sinav"],
-          "dogru": s["dogru"],
-          "yanlis": s["yanlis"],
-          "bos": s["bos"],
-          "puan": s["puan"],
-          "derece": s["derece"] if s["derece"] else "",
-      })
-
-    veriler[no] = {"ad": ad, "sinavlar": sinavlar}
-
-  conn.close()
-  return veriler
+    return veriler
 
 
 @app.route("/", methods=["GET", "POST"])
 def veli_sorgula():
-  sonuc, hata = None, None
-  en_son_derece = None
-  sinav_verileri = sinav_verilerini_getir()
+    sonuc, hata = None, None
+    en_son_derece = None
+    sinav_verileri = sinav_verilerini_getir()
 
-  if request.method == "POST":
-    ogrenci_no = request.form.get("ogrenci_no", "").strip()
-    if not ogrenci_no:
-      hata = "Lütfen geçerli bir öğrenci numarası giriniz."
-    elif ogrenci_no in sinav_verileri:
-      ham_veri = sinav_verileri[ogrenci_no]
-      ters_sinavlar = list(reversed(ham_veri.get("sinavlar", [])))
-      sonuc = {"ad": ham_veri["ad"], "sinavlar": ters_sinavlar}
+    if request.method == "POST":
+        ogrenci_no = request.form.get("ogrenci_no", "").strip()
+        if not ogrenci_no:
+            hata = "Lütfen geçerli bir öğrenci numarası giriniz."
+        elif ogrenci_no in sinav_verileri:
+            ham_veri = sinav_verileri[ogrenci_no]
+            ters_sinavlar = list(reversed(ham_veri.get("sinavlar", [])))
+            sonuc = {"ad": ham_veri["ad"], "sinavlar": ters_sinavlar}
 
-      if ters_sinavlar:
-        en_son_sinav = ters_sinavlar[0]
-        d_val = (
-            str(en_son_sinav.get("derece", "")).replace(".", "").strip().lower()
-        )
-        if d_val in ["1", "2", "3"]:
-          en_son_derece = d_val
-    else:
-      hata = "Bu numaraya ait öğrenci veya sınav sonucu bulunamadı."
+            if ters_sinavlar:
+                en_son_sinav = ters_sinavlar[0]
+                d_val = (
+                    str(en_son_sinav.get("derece", "")).replace(".", "").strip().lower()
+                )
+                if d_val in ["1", "2", "3"]:
+                    en_son_derece = d_val
+        else:
+            hata = "Bu numaraya ait öğrenci veya sınav sonucu bulunamadı."
 
-  return render_template(
-      "sorgula.html",
-      sonuc=sonuc,
-      hata=hata,
-      en_son_derece=en_son_derece,
-  )
+    return render_template(
+        "sorgula.html",
+        sonuc=sonuc,
+        hata=hata,
+        en_son_derece=en_son_derece,
+    )
 
 
 @app.route("/admin", methods=["GET", "POST"])
 def admin_panel():
-  sinav_verileri = sinav_verilerini_getir()
+    sinav_verileri = sinav_verilerini_getir()
 
-  if request.method == "POST":
-    sifre = request.form.get("sifre", "").strip()
-    if sifre == ADMIN_PASSWORD:
-      session["admin_logged_in"] = True
-    else:
-      flash("Hatalı şifre!", "error")
-      return render_template(
-          "admin.html",
-          veriler=sinav_verileri,
-          giris_yapildi=False,
-          son_sinav="",
-      )
+    if request.method == "POST":
+        sifre = request.form.get("sifre", "").strip()
+        if sifre == ADMIN_PASSWORD:
+            session["admin_logged_in"] = True
+        else:
+            flash("Hatalı şifre!", "error")
+            return render_template(
+                "admin.html",
+                veriler=sinav_verileri,
+                giris_yapildi=False,
+                son_sinav="",
+            )
 
-  if not session.get("admin_logged_in"):
+    if not session.get("admin_logged_in"):
+        return render_template(
+            "admin.html", veriler=sinav_verileri, giris_yapildi=False, son_sinav=""
+        )
+
+    son_sinav = session.get("son_sinav_adi", "")
     return render_template(
-        "admin.html", veriler=sinav_verileri, giris_yapildi=False, son_sinav=""
+        "admin.html",
+        veriler=sinav_verileri,
+        giris_yapildi=True,
+        son_sinav=son_sinav,
     )
-
-  son_sinav = session.get("son_sinav_adi", "")
-  return render_template(
-      "admin.html",
-      veriler=sinav_verileri,
-      giris_yapildi=True,
-      son_sinav=son_sinav,
-  )
 
 
 @app.route("/admin/ogrenci-ara/<ogrenci_no>")
 def ogrenci_ara(ogrenci_no):
-  if not session.get("admin_logged_in"):
+    if not session.get("admin_logged_in"):
+        return jsonify({"bulundu": False})
+
+    conn = db_baglantisi()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT ad FROM ogrenciler WHERE ogrenci_no = %s", (str(ogrenci_no).strip(),)
+    )
+    row = cursor.fetchone()
+    cursor.close()
+    conn.close()
+
+    if row:
+        return jsonify({"bulundu": True, "ad": row["ad"]})
     return jsonify({"bulundu": False})
-
-  conn = db_baglantisi()
-  cursor = conn.cursor()
-  cursor.execute(
-      "SELECT ad FROM ogrenciler WHERE ogrenci_no = ?", (str(ogrenci_no).strip(),)
-  )
-  row = cursor.fetchone()
-  conn.close()
-
-  if row:
-    return jsonify({"bulundu": True, "ad": row["ad"]})
-  return jsonify({"bulundu": False})
 
 
 @app.route("/admin/cikis")
 def admin_cikis():
-  session.clear()
-  return redirect(url_for("admin_panel"))
+    session.clear()
+    return redirect(url_for("admin_panel"))
 
 
 @app.route("/admin/kaydet", methods=["POST"])
 def ogrenci_kaydet():
-  if not session.get("admin_logged_in"):
+    if not session.get("admin_logged_in"):
+        return redirect(url_for("admin_panel"))
+
+    ogrenci_no = request.form.get("ogrenci_no", "").strip()
+    ad = request.form.get("ad", "").strip()
+    sinav_adi = request.form.get("sinav", "Genel Sınav").strip()
+    derece = request.form.get("derece", "").strip()
+
+    if sinav_adi:
+        session["son_sinav_adi"] = sinav_adi
+
+    try:
+        dogru = int(request.form.get("dogru", 0))
+        yanlis = int(request.form.get("yanlis", 0))
+        bos = int(request.form.get("bos", 0))
+        puan = int(request.form.get("puan", 0))
+    except ValueError:
+        dogru, yanlis, bos, puan = 0, 0, 0, 0
+
+    if ogrenci_no and ad:
+        conn = db_baglantisi()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+                INSERT INTO ogrenciler (ogrenci_no, ad) VALUES (%s, %s)
+                ON CONFLICT (ogrenci_no) DO UPDATE SET ad = EXCLUDED.ad
+            """,
+            (ogrenci_no, ad),
+        )
+
+        cursor.execute(
+            """
+                INSERT INTO sinavlar (ogrenci_no, sinav, dogru, yanlis, bos, puan, derece)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (ogrenci_no, sinav) DO UPDATE SET
+                    dogru = EXCLUDED.dogru,
+                    yanlis = EXCLUDED.yanlis,
+                    bos = EXCLUDED.bos,
+                    puan = EXCLUDED.puan,
+                    derece = EXCLUDED.derece
+            """,
+            (ogrenci_no, sinav_adi, dogru, yanlis, bos, puan, derece),
+        )
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        flash(f"Başarılı: {ad} - {sinav_adi} kaydedildi.", "success")
+
     return redirect(url_for("admin_panel"))
-
-  ogrenci_no = request.form.get("ogrenci_no", "").strip()
-  ad = request.form.get("ad", "").strip()
-  sinav_adi = request.form.get("sinav", "Genel Sınav").strip()
-  derece = request.form.get("derece", "").strip()
-
-  if sinav_adi:
-    session["son_sinav_adi"] = sinav_adi
-
-  try:
-    dogru = int(request.form.get("dogru", 0))
-    yanlis = int(request.form.get("yanlis", 0))
-    bos = int(request.form.get("bos", 0))
-    puan = int(request.form.get("puan", 0))
-  except ValueError:
-    dogru, yanlis, bos, puan = 0, 0, 0, 0
-
-  if ogrenci_no and ad:
-    conn = db_baglantisi()
-    cursor = conn.cursor()
-
-    cursor.execute(
-        """
-            INSERT INTO ogrenciler (ogrenci_no, ad) VALUES (?, ?)
-            ON CONFLICT(ogrenci_no) DO UPDATE SET ad = excluded.ad
-        """,
-        (ogrenci_no, ad),
-    )
-
-    cursor.execute(
-        """
-            INSERT INTO sinavlar (ogrenci_no, sinav, dogru, yanlis, bos, puan, derece)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(ogrenci_no, sinav) DO UPDATE SET
-                dogru = excluded.dogru,
-                yanlis = excluded.yanlis,
-                bos = excluded.bos,
-                puan = excluded.puan,
-                derece = excluded.derece
-        """,
-        (ogrenci_no, sinav_adi, dogru, yanlis, bos, puan, derece),
-    )
-
-    conn.commit()
-    conn.close()
-
-    # Otomatik Yedek Dosyasını Güncelle
-    excel_otomatik_senkronize()
-
-    flash(f"Başarılı: {ad} - {sinav_adi} kaydedildi.", "success")
-
-  return redirect(url_for("admin_panel"))
 
 
 @app.route("/admin/ogrenci-sil/<ogrenci_no>")
 def ogrenci_sil(ogrenci_no):
-  if not session.get("admin_logged_in"):
+    if not session.get("admin_logged_in"):
+        return redirect(url_for("admin_panel"))
+
+    conn = db_baglantisi()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM sinavlar WHERE ogrenci_no = %s", (str(ogrenci_no),))
+    cursor.execute("DELETE FROM ogrenciler WHERE ogrenci_no = %s", (str(ogrenci_no),))
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    flash("Öğrenci veritabanından silindi.", "info")
     return redirect(url_for("admin_panel"))
-
-  conn = db_baglantisi()
-  cursor = conn.cursor()
-  cursor.execute(
-      "DELETE FROM sinavlar WHERE ogrenci_no = ?", (str(ogrenci_no),)
-  )
-  cursor.execute(
-      "DELETE FROM ogrenciler WHERE ogrenci_no = ?", (str(ogrenci_no),)
-  )
-  conn.commit()
-  conn.close()
-
-  excel_otomatik_senkronize()
-
-  flash("Öğrenci veritabanından silindi.", "info")
-  return redirect(url_for("admin_panel"))
 
 
 @app.route("/admin/sinav-sil/<ogrenci_no>/<path:sinav_adi>")
 def sinav_sil(ogrenci_no, sinav_adi):
-  if not session.get("admin_logged_in"):
+    if not session.get("admin_logged_in"):
+        return redirect(url_for("admin_panel"))
+
+    conn = db_baglantisi()
+    cursor = conn.cursor()
+    cursor.execute(
+        "DELETE FROM sinavlar WHERE ogrenci_no = %s AND sinav = %s",
+        (str(ogrenci_no), sinav_adi),
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    flash("Sınav sonucu silindi.", "info")
     return redirect(url_for("admin_panel"))
-
-  conn = db_baglantisi()
-  cursor = conn.cursor()
-  cursor.execute(
-      "DELETE FROM sinavlar WHERE ogrenci_no = ? AND sinav = ?",
-      (str(ogrenci_no), sinav_adi),
-  )
-  conn.commit()
-  conn.close()
-
-  excel_otomatik_senkronize()
-
-  flash("Sınav sonucu silindi.", "info")
-  return redirect(url_for("admin_panel"))
 
 
 @app.route("/admin/excel-yukle", methods=["POST"])
 def excel_yukle():
-  if not session.get("admin_logged_in"):
-    return redirect(url_for("admin_panel"))
+    if not session.get("admin_logged_in"):
+        return redirect(url_for("admin_panel"))
 
-  dosya = request.files.get("excel_dosya")
-  if dosya:
-    try:
-      df = pd.read_excel(dosya)
-      df.columns = [str(col).strip().lower() for col in df.columns]
-
-      conn = db_baglantisi()
-      cursor = conn.cursor()
-
-      for _, row in df.iterrows():
-        no = str(
-            row.get("ogrenci_no", row.get("no", row.get("okul_no", "0")))
-        ).strip()
-        ad = str(row.get("ad", row.get("ad_soyad", "İsimsiz"))).strip()
-        sinav_adi = str(
-            row.get("sinav", row.get("sinav_adi", "Genel Sınav"))
-        ).strip()
-
+    dosya = request.files.get("excel_dosya")
+    if dosya:
         try:
-          dogru = int(
-              row.get("dogru", 0) if pd.notna(row.get("dogru", 0)) else 0
-          )
-          yanlis = int(
-              row.get("yanlis", 0) if pd.notna(row.get("yanlis", 0)) else 0
-          )
-          bos = int(row.get("bos", 0) if pd.notna(row.get("bos", 0)) else 0)
-          puan = int(row.get("puan", 0) if pd.notna(row.get("puan", 0)) else 0)
-          derece = str(
-              row.get("derece", "") if pd.notna(row.get("derece", "")) else ""
-          ).strip()
-          if derece == "nan":
-            derece = ""
-        except:
-          dogru, yanlis, bos, puan, derece = 0, 0, 0, 0, ""
+            df = pd.read_excel(dosya)
+            df.columns = [str(col).strip().lower() for col in df.columns]
 
-        if no and no != "nan":
-          cursor.execute(
-              """
-                        INSERT INTO ogrenciler (ogrenci_no, ad) VALUES (?, ?)
-                        ON CONFLICT(ogrenci_no) DO UPDATE SET ad = excluded.ad
-                    """,
-              (no, ad),
-          )
+            conn = db_baglantisi()
+            cursor = conn.cursor()
 
-          cursor.execute(
-              """
-                        INSERT INTO sinavlar (ogrenci_no, sinav, dogru, yanlis, bos, puan, derece)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
-                        ON CONFLICT(ogrenci_no, sinav) DO UPDATE SET
-                            dogru = excluded.dogru,
-                            yanlis = excluded.yanlis,
-                            bos = excluded.bos,
-                            puan = excluded.puan,
-                            derece = excluded.derece
-                    """,
-              (no, sinav_adi, dogru, yanlis, bos, puan, derece),
-          )
+            for _, row in df.iterrows():
+                no = str(
+                    row.get("ogrenci_no", row.get("no", row.get("okul_no", "0")))
+                ).strip()
+                ad = str(row.get("ad", row.get("ad_soyad", "İsimsiz"))).strip()
+                sinav_adi = str(
+                    row.get("sinav", row.get("sinav_adi", "Genel Sınav"))
+                ).strip()
 
-      conn.commit()
-      conn.close()
+                try:
+                    dogru = int(
+                        row.get("dogru", 0) if pd.notna(row.get("dogru", 0)) else 0
+                    )
+                    yanlis = int(
+                        row.get("yanlis", 0) if pd.notna(row.get("yanlis", 0)) else 0
+                    )
+                    bos = int(row.get("bos", 0) if pd.notna(row.get("bos", 0)) else 0)
+                    puan = int(row.get("puan", 0) if pd.notna(row.get("puan", 0)) else 0)
+                    derece = str(
+                        row.get("derece", "") if pd.notna(row.get("derece", "")) else ""
+                    ).strip()
+                    if derece == "nan":
+                        derece = ""
+                except:
+                    dogru, yanlis, bos, puan, derece = 0, 0, 0, 0, ""
 
-      excel_otomatik_senkronize()
+                if no and no != "nan":
+                    cursor.execute(
+                        """
+                            INSERT INTO ogrenciler (ogrenci_no, ad) VALUES (%s, %s)
+                            ON CONFLICT (ogrenci_no) DO UPDATE SET ad = EXCLUDED.ad
+                        """,
+                        (no, ad),
+                    )
 
-      flash("Excel verileri veritabanına aktarıldı!", "success")
-    except Exception as e:
-      flash(f"Excel yüklenirken hata: {str(e)}", "error")
+                    cursor.execute(
+                        """
+                            INSERT INTO sinavlar (ogrenci_no, sinav, dogru, yanlis, bos, puan, derece)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                            ON CONFLICT (ogrenci_no, sinav) DO UPDATE SET
+                                dogru = EXCLUDED.dogru,
+                                yanlis = EXCLUDED.yanlis,
+                                bos = EXCLUDED.bos,
+                                puan = EXCLUDED.puan,
+                                derece = EXCLUDED.derece
+                        """,
+                        (no, sinav_adi, dogru, yanlis, bos, puan, derece),
+                    )
 
-  return redirect(url_for("admin_panel"))
+            conn.commit()
+            cursor.close()
+            conn.close()
+
+            flash("Excel verileri bulut veritabanına aktarıldı!", "success")
+        except Exception as e:
+            flash(f"Excel yüklenirken hata: {str(e)}", "error")
+
+    return redirect(url_for("admin_panel"))
 
 
 @app.route("/admin/excel-indir")
 def excel_indir():
-  if not session.get("admin_logged_in"):
-    return redirect(url_for("admin_panel"))
+    if not session.get("admin_logged_in"):
+        return redirect(url_for("admin_panel"))
 
-  try:
-    sinav_verileri = sinav_verilerini_getir()
-    satirlar = []
+    try:
+        sinav_verileri = sinav_verilerini_getir()
+        satirlar = []
 
-    for no, bilgi in sinav_verileri.items():
-      ad = bilgi["ad"]
-      for s in bilgi["sinavlar"]:
-        satirlar.append({
-            "ogrenci_no": no,
-            "ad": ad,
-            "sinav": s["sinav"],
-            "dogru": s["dogru"],
-            "yanlis": s["yanlis"],
-            "bos": s["bos"],
-            "puan": s["puan"],
-            "derece": s.get("derece", ""),
-        })
+        for no, bilgi in sinav_verileri.items():
+            ad = bilgi["ad"]
+            for s in bilgi["sinavlar"]:
+                satirlar.append({
+                    "ogrenci_no": no,
+                    "ad": ad,
+                    "sinav": s["sinav"],
+                    "dogru": s["dogru"],
+                    "yanlis": s["yanlis"],
+                    "bos": s["bos"],
+                    "puan": s["puan"],
+                    "derece": s.get("derece", ""),
+                })
 
-    df = pd.DataFrame(satirlar)
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine="openpyxl") as writer:
-      df.to_excel(writer, index=False)
-    output.seek(0)
+        df = pd.DataFrame(satirlar)
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+            df.to_excel(writer, index=False)
+        output.seek(0)
 
-    return send_file(
-        output,
-        as_attachment=True,
-        download_name="Büşra Güngör Öğrenci Sınav Sonuçları.xlsx",
-        mimetype=(
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        ),
-    )
-  except Exception as e:
-    flash(f"İndirme sırasında bir hata oluştu: {str(e)}", "error")
-    return redirect(url_for("admin_panel"))
+        return send_file(
+            output,
+            as_attachment=True,
+            download_name="Büşra Güngör Öğrenci Sınav Sonuçları.xlsx",
+            mimetype=(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            ),
+        )
+    except Exception as e:
+        flash(f"İndirme sırasında bir hata oluştu: {str(e)}", "error")
+        return redirect(url_for("admin_panel"))
 
 
 if __name__ == "__main__":

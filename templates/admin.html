@@ -62,7 +62,7 @@
 
     <main class="max-w-6xl mx-auto p-4 md:p-6 space-y-6">
 
-        <!-- ZİYARET VE SORGULAMA İSTATİSTİK KARTLARI -->
+        <!-- GENEL İSTATİSTİK KARTLARI -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between">
                 <div>
@@ -76,7 +76,7 @@
 
             <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between">
                 <div>
-                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Toplam Sorgulama Yapılma Sayısı</span>
+                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Toplam Yapılan Sorgulama</span>
                     <h2 class="text-3xl font-black text-emerald-600 mt-1">{{ toplam_sorgu }}</h2>
                 </div>
                 <div class="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-2xl">
@@ -179,10 +179,10 @@
                 </div>
             </div>
 
-            <!-- TABLO: KAYITLI ÖĞRENCİ LİSTESİ -->
+            <!-- TABLO: KAYITLI ÖĞRENCİ LİSTESİ VE SORGULANMA BİLGİLERİ -->
             <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
                 <div class="flex justify-between items-center border-b pb-3">
-                    <h2 class="text-base font-bold text-slate-800">Kayıtlı Öğrenci ve Detaylı Sınav Listesi</h2>
+                    <h2 class="text-base font-bold text-slate-800">Öğrenci Sorgulanma İstatistikleri ve Sınav Listesi</h2>
                     <span class="text-xs font-bold bg-slate-100 px-3 py-1 rounded-full text-slate-600">Toplam {{ veriler|length }} Öğrenci</span>
                 </div>
 
@@ -191,7 +191,7 @@
                         <thead>
                             <tr class="bg-slate-50 text-slate-500 border-b">
                                 <th class="p-2.5 w-16">No</th>
-                                <th class="p-2.5 w-32">Ad Soyad</th>
+                                <th class="p-2.5 w-32">Ad Soyad & Sorgu Bilgisi</th>
                                 <th class="p-2.5">Sınav Geçmişi (D, Y, B, Puan & Sıralama)</th>
                                 <th class="p-2.5 text-right w-16">İşlem</th>
                             </tr>
@@ -200,7 +200,21 @@
                             {% for no, bilgi in veriler.items() %}
                             <tr class="hover:bg-slate-50/80 transition">
                                 <td class="p-2.5 font-bold text-indigo-600 align-top pt-3">{{ no }}</td>
-                                <td class="p-2.5 font-bold text-slate-800 align-top pt-3">{{ bilgi.ad }}</td>
+                                <td class="p-2.5 align-top pt-3 space-y-1">
+                                    <div class="font-bold text-slate-800">{{ bilgi.ad }}</div>
+                                    <div class="text-[11px]">
+                                        {% if bilgi.sorgu_sayisi > 0 %}
+                                            <span class="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded border border-emerald-300 inline-block">
+                                                🔍 {{ bilgi.sorgu_sayisi }} kez bakıldı
+                                            </span>
+                                            <div class="text-[10px] text-slate-400 mt-1">Son: {{ bilgi.son_sorgu_tarihi }}</div>
+                                        {% else %}
+                                            <span class="bg-slate-100 text-slate-500 font-semibold px-2 py-0.5 rounded border border-slate-200 inline-block">
+                                                Henüz bakılmadı
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                </td>
                                 <td class="p-2.5 space-y-1.5">
                                     {% for s in bilgi.sinavlar %}
                                     <div class="flex flex-wrap items-center gap-2 text-[11px] bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-200 justify-between">

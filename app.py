@@ -18,18 +18,21 @@ import pandas as pd
 app = Flask(__name__)
 app.secret_key = "ogretmen_cok_gizli_guvenlik_anahtari_98765"
 
-ADMIN_PASSWORD = "15698"  # İstediğiniz yeni admin şifresi
+ADMIN_PASSWORD = "15698"
 
-# Render'daki Neon PostgreSQL bağlantı adresini alır
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 def db_baglantisi():
-    """PostgreSQL (Neon) bulut veritabanına bağlanır."""
+    """PostgreSQL (Neon) bulut veritabanına güvenli bağlanır."""
     if DATABASE_URL:
-        conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+        # sslmode=require ekleyerek bulut bağlantısının kopmasını engelleriz
+        url = DATABASE_URL
+        if "sslmode" not in url:
+            url += "?sslmode=require" if "?" not in url else "&sslmode=require"
+        conn = psycopg2.connect(url, cursor_factory=RealDictCursor)
         return conn
     else:
-        raise Exception("DATABASE_URL ortam değişkeni bulunamadı! Lütfen Render Environment ayarlarına ekleyin.")
+        raise Exception("DATABASE_URL ortam değişkeni bulunamadı!")
 
 def veritabani_kur():
     """Bulut veritabanında tabloları otomatik oluşturur."""
@@ -66,42 +69,46 @@ def veritabani_kur():
     except Exception as e:
         print(f"Veritabanı kurulum hatası: {e}")
 
-# Uygulama başlarken bulut veritabanı tablolarını kur
+# Uygulama başlarken tabloları kur
 veritabani_kur()
 
 def sinav_verilerini_getir():
-    conn = db_baglantisi()
-    cursor = conn.cursor()
+    try:
+        conn = db_baglantisi()
+        cursor = conn.cursor()
 
-    cursor.execute("SELECT * FROM ogrenciler")
-    ogrenci_satirlari = cursor.fetchall()
+        cursor.execute("SELECT * FROM ogrenciler")
+        ogrenci_satirlari = cursor.fetchall()
 
-    veriler = {}
-    for ogrenci in ogrenci_satirlari:
-        no = ogrenci["ogrenci_no"]
-        ad = ogrenci["ad"]
+        veriler = {}
+        for ogrenci in ogrenci_satirlari:
+            no = ogrenci["ogrenci_no"]
+            ad = ogrenci["ad"]
 
-        cursor.execute(
-            "SELECT * FROM sinavlar WHERE ogrenci_no = %s ORDER BY id ASC", (no,)
-        )
-        sinav_satirlari = cursor.fetchall()
+            cursor.execute(
+                "SELECT * FROM sinavlar WHERE ogrenci_no = %s ORDER BY id ASC", (no,)
+            )
+            sinav_satirlari = cursor.fetchall()
 
-        sinavlar = []
-        for s in sinav_satirlari:
-            sinavlar.append({
-                "sinav": s["sinav"],
-                "dogru": s["dogru"],
-                "yanlis": s["yanlis"],
-                "bos": s["bos"],
-                "puan": s["puan"],
-                "derece": s["derece"] if s["derece"] else "",
-            })
+            sinavlar = []
+            for s in sinav_satirlari:
+                sinavlar.append({
+                    "sinav": s["sinav"],
+                    "dogru": s["dogru"],
+                    "yanlis": s["yanlis"],
+                    "bos": s["bos"],
+                    "puan": s["puan"],
+                    "derece": s["derece"] if s["derece"] else "",
+                })
 
-        veriler[no] = {"ad": ad, "sinavlar": sinavlar}
+            veriler[no] = {"ad": ad, "sinavlar": sinavlar}
 
-    cursor.close()
-    conn.close()
-    return veriler
+        cursor.close()
+        conn.close()
+        return veriler
+    except Exception as e:
+        print(f"Veri getirme hatası: {e}")
+        return {}
 
 
 @app.route("/", methods=["GET", "POST"])
@@ -173,17 +180,20 @@ def ogrenci_ara(ogrenci_no):
     if not session.get("admin_logged_in"):
         return jsonify({"bulundu": False})
 
-    conn = db_baglantisi()
-    cursor = conn.cursor()
-    cursor.execute(
-        "SELECT ad FROM ogrenciler WHERE ogrenci_no = %s", (str(ogrenci_no).strip(),)
-    )
-    row = cursor.fetchone()
-    cursor.close()
-    conn.close()
+    try:
+        conn = db_baglantisi()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT ad FROM ogrenciler WHERE ogrenci_no = %s", (str(ogrenci_no).strip(),)
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
 
-    if row:
-        return jsonify({"bulundu": True, "ad": row["ad"]})
+        if row:
+            return jsonify({"bulundu": True, "ad": row["ad"]})
+    except:
+        pass
     return jsonify({"bulundu": False})
 
 
@@ -215,36 +225,39 @@ def ogrenci_kaydet():
         dogru, yanlis, bos, puan = 0, 0, 0, 0
 
     if ogrenci_no and ad:
-        conn = db_baglantisi()
-        cursor = conn.cursor()
+        try:
+            conn = db_baglantisi()
+            cursor = conn.cursor()
 
-        cursor.execute(
-            """
-                INSERT INTO ogrenciler (ogrenci_no, ad) VALUES (%s, %s)
-                ON CONFLICT (ogrenci_no) DO UPDATE SET ad = EXCLUDED.ad
-            """,
-            (ogrenci_no, ad),
-        )
+            cursor.execute(
+                """
+                    INSERT INTO ogrenciler (ogrenci_no, ad) VALUES (%s, %s)
+                    ON CONFLICT (ogrenci_no) DO UPDATE SET ad = EXCLUDED.ad
+                """,
+                (ogrenci_no, ad),
+            )
 
-        cursor.execute(
-            """
-                INSERT INTO sinavlar (ogrenci_no, sinav, dogru, yanlis, bos, puan, derece)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (ogrenci_no, sinav) DO UPDATE SET
-                    dogru = EXCLUDED.dogru,
-                    yanlis = EXCLUDED.yanlis,
-                    bos = EXCLUDED.bos,
-                    puan = EXCLUDED.puan,
-                    derece = EXCLUDED.derece
-            """,
-            (ogrenci_no, sinav_adi, dogru, yanlis, bos, puan, derece),
-        )
+            cursor.execute(
+                """
+                    INSERT INTO sinavlar (ogrenci_no, sinav, dogru, yanlis, bos, puan, derece)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (ogrenci_no, sinav) DO UPDATE SET
+                        dogru = EXCLUDED.dogru,
+                        yanlis = EXCLUDED.yanlis,
+                        bos = EXCLUDED.bos,
+                        puan = EXCLUDED.puan,
+                        derece = EXCLUDED.derece
+                """,
+                (ogrenci_no, sinav_adi, dogru, yanlis, bos, puan, derece),
+            )
 
-        conn.commit()
-        cursor.close()
-        conn.close()
+            conn.commit()
+            cursor.close()
+            conn.close()
 
-        flash(f"Başarılı: {ad} - {sinav_adi} kaydedildi.", "success")
+            flash(f"Başarılı: {ad} - {sinav_adi} kaydedildi.", "success")
+        except Exception as e:
+            flash(f"Kayıt hatası: {str(e)}", "error")
 
     return redirect(url_for("admin_panel"))
 
@@ -254,15 +267,18 @@ def ogrenci_sil(ogrenci_no):
     if not session.get("admin_logged_in"):
         return redirect(url_for("admin_panel"))
 
-    conn = db_baglantisi()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM sinavlar WHERE ogrenci_no = %s", (str(ogrenci_no),))
-    cursor.execute("DELETE FROM ogrenciler WHERE ogrenci_no = %s", (str(ogrenci_no),))
-    conn.commit()
-    cursor.close()
-    conn.close()
+    try:
+        conn = db_baglantisi()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM sinavlar WHERE ogrenci_no = %s", (str(ogrenci_no),))
+        cursor.execute("DELETE FROM ogrenciler WHERE ogrenci_no = %s", (str(ogrenci_no),))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        flash("Öğrenci veritabanından silindi.", "info")
+    except Exception as e:
+        flash(f"Silme hatası: {e}", "error")
 
-    flash("Öğrenci veritabanından silindi.", "info")
     return redirect(url_for("admin_panel"))
 
 
@@ -271,17 +287,20 @@ def sinav_sil(ogrenci_no, sinav_adi):
     if not session.get("admin_logged_in"):
         return redirect(url_for("admin_panel"))
 
-    conn = db_baglantisi()
-    cursor = conn.cursor()
-    cursor.execute(
-        "DELETE FROM sinavlar WHERE ogrenci_no = %s AND sinav = %s",
-        (str(ogrenci_no), sinav_adi),
-    )
-    conn.commit()
-    cursor.close()
-    conn.close()
+    try:
+        conn = db_baglantisi()
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM sinavlar WHERE ogrenci_no = %s AND sinav = %s",
+            (str(ogrenci_no), sinav_adi),
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+        flash("Sınav sonucu silindi.", "info")
+    except Exception as e:
+        flash(f"Silme hatası: {e}", "error")
 
-    flash("Sınav sonucu silindi.", "info")
     return redirect(url_for("admin_panel"))
 
 
@@ -362,7 +381,7 @@ def excel_yukle():
 @app.route("/admin/excel-indir")
 def excel_indir():
     if not session.get("admin_logged_in"):
-        return redirect(url_for("admin_path") if 'admin_path' in globals() else url_for("admin_panel"))
+        return redirect(url_for("admin_panel"))
 
     try:
         sinav_verileri = sinav_verilerini_getir()

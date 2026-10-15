@@ -1,6 +1,6 @@
 import io
 import os
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from flask import (
@@ -23,6 +23,9 @@ ADMIN_PASSWORD = "15698"
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
+# Türkiye Saat Dilimi (UTC+3)
+TURKEY_TZ = timezone(timedelta(hours=3))
+
 def db_baglantisi():
     """PostgreSQL (Neon) bulut veritabanına güvenli bağlanır."""
     if DATABASE_URL:
@@ -40,7 +43,7 @@ def veritabani_kur():
         conn = db_baglantisi()
         cursor = conn.cursor()
 
-        # Öğrenciler tablosu (Sorgu sayısı ve son sorgu zamanı eklendi)
+        # Öğrenciler tablosu
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS ogrenciler (
                 ogrenci_no TEXT PRIMARY KEY,
@@ -50,7 +53,6 @@ def veritabani_kur():
             )
         """)
 
-        # Eski tablolarda bu sütunlar yoksa ekle (hata vermemesi için güvenli kontrol)
         cursor.execute("ALTER TABLE ogrenciler ADD COLUMN IF NOT EXISTS sorgu_sayisi INTEGER DEFAULT 0")
         cursor.execute("ALTER TABLE ogrenciler ADD COLUMN IF NOT EXISTS son_sorgu_tarihi TEXT DEFAULT '-'")
 
@@ -183,9 +185,9 @@ def veli_sorgula():
         if not ogrenci_no:
             hata = "Lütfen geçerli bir öğrenci numarası giriniz."
         elif ogrenci_no in sinav_verileri:
-            # Öğrenci sorgulandığında o öğrencinin sayaç bilgilerini veritabanında güncelle
+            # Türkiye saatine göre (UTC+3) anlık zamanı kaydet
             try:
-                simdi = datetime.now().strftime("%d.%m.%Y %H:%M")
+                simdi = datetime.now(TURKEY_TZ).strftime("%d.%m.%Y %H:%M")
                 conn = db_baglantisi()
                 cursor = conn.cursor()
                 cursor.execute(
@@ -202,7 +204,6 @@ def veli_sorgula():
             except Exception as e:
                 print(f"Öğrenci sayaç güncelleme hatası: {e}")
 
-            # Güncel veriyi tekrar çek
             sinav_verileri = sinav_verilerini_getir()
             ham_veri = sinav_verileri[ogrenci_no]
             ters_sinavlar = list(reversed(ham_veri.get("sinavlar", [])))

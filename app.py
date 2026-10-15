@@ -1,5 +1,6 @@
 import io
 import os
+from datetime import datetime
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from flask import (
@@ -34,17 +35,24 @@ def db_baglantisi():
         raise Exception("DATABASE_URL ortam değişkeni bulunamadı!")
 
 def veritabani_kur():
-    """Bulut veritabanında tabloları ve sayaç tablosunu otomatik oluşturur."""
+    """Bulut veritabanında tabloları ve öğrenci bazlı sayaçları otomatik oluşturur."""
     try:
         conn = db_baglantisi()
         cursor = conn.cursor()
 
+        # Öğrenciler tablosu (Sorgu sayısı ve son sorgu zamanı eklendi)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS ogrenciler (
                 ogrenci_no TEXT PRIMARY KEY,
-                ad TEXT NOT NULL
+                ad TEXT NOT NULL,
+                sorgu_sayisi INTEGER DEFAULT 0,
+                son_sorgu_tarihi TEXT DEFAULT '-'
             )
         """)
+
+        # Eski tablolarda bu sütunlar yoksa ekle (hata vermemesi için güvenli kontrol)
+        cursor.execute("ALTER TABLE ogrenciler ADD COLUMN IF NOT EXISTS sorgu_sayisi INTEGER DEFAULT 0")
+        cursor.execute("ALTER TABLE ogrenciler ADD COLUMN IF NOT EXISTS son_sorgu_tarihi TEXT DEFAULT '-'")
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS sinavlar (
@@ -61,7 +69,7 @@ def veritabani_kur():
             )
         """)
 
-        # Ziyaret ve Sorgulama Sayacı İçin Tablo
+        # Genel Ziyaret ve Sorgulama Sayacı İçin Tablo
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS istatistikler (
                 id INTEGER PRIMARY KEY,
@@ -70,7 +78,6 @@ def veritabani_kur():
             )
         """)
 
-        # Eğer ilk defa kuruluyorsa başlangıç satırını ekle
         cursor.execute("""
             INSERT INTO istatistikler (id, toplam_ziyaret, toplam_sorgu)
             VALUES (1, 0, 0)
@@ -80,39 +87,27 @@ def veritabani_kur():
         conn.commit()
         cursor.close()
         conn.close()
-        print("Bulut veritabanı ve sayaç tabloları başarıyla hazırlandı.")
+        print("Bulut veritabanı ve öğrenci bazlı sayaç tabloları hazır.")
     except Exception as e:
         print(f"Veritabanı kurulum hatası: {e}")
 
-# Uygulama başlarken tabloları kur
 veritabani_kur()
 
-def istatistikleri_getir_ve_arttir(tip="ziyaret"):
-    """Ziyaret veya sorgu sayısını 1 artırır ve güncel sayıları döndürür."""
+def genel_istatistik_arttir(tip="ziyaret"):
     try:
         conn = db_baglantisi()
         cursor = conn.cursor()
-
         if tip == "ziyaret":
             cursor.execute("UPDATE istatistikler SET toplam_ziyaret = toplam_ziyaret + 1 WHERE id = 1")
         elif tip == "sorgu":
             cursor.execute("UPDATE istatistikler SET toplam_sorgu = toplam_sorgu + 1 WHERE id = 1")
-
         conn.commit()
-
-        cursor.execute("SELECT toplam_ziyaret, toplam_sorgu FROM istatistikler WHERE id = 1")
-        res = cursor.fetchone()
         cursor.close()
         conn.close()
+    except:
+        pass
 
-        if res:
-            return res["toplam_ziyaret"], res["toplam_sorgu"]
-    except Exception as e:
-        print(f"İstatistik hatası: {e}")
-    return 0, 0
-
-def istatistikleri_oku():
-    """Artırmadan sadece mevcut sayaçları okur (Admin paneli için)."""
+def genel_istatistikleri_oku():
     try:
         conn = db_baglantisi()
         cursor = conn.cursor()
@@ -138,6 +133,8 @@ def sinav_verilerini_getir():
         for ogrenci in ogrenci_satirlari:
             no = ogrenci["ogrenci_no"]
             ad = ogrenci["ad"]
+            sorgu_sayisi = ogrenci.get("sorgu_sayisi", 0)
+            son_sorgu_tarihi = ogrenci.get("son_sorgu_tarihi", "-")
 
             cursor.execute(
                 "SELECT * FROM sinavlar WHERE ogrenci_no = %s ORDER BY id ASC", (no,)
@@ -155,7 +152,12 @@ def sinav_verilerini_getir():
                     "derece": s["derece"] if s["derece"] else "",
                 })
 
-            veriler[no] = {"ad": ad, "sinavlar": sinavlar}
+            veriler[no] = {
+                "ad": ad,
+                "sorgu_sayisi": sorgu_sayisi,
+                "son_sorgu_tarihi": son_sorgu_tarihi,
+                "sinavlar": sinavlar
+            }
 
         cursor.close()
         conn.close()
@@ -171,18 +173,37 @@ def veli_sorgula():
     en_son_derece = None
     sinav_verileri = sinav_verilerini_getir()
 
-    # Sayfa ilk açıldığında (GET isteği) toplam ziyaret sayısını 1 artır
     if request.method == "GET":
-        istatistikleri_getir_ve_arttir("ziyaret")
+        genel_istatistik_arttir("ziyaret")
 
     if request.method == "POST":
-        # Her sorgulama butonuna basıldığında (POST isteği) sorgu sayısını 1 artır
-        istatistikleri_getir_ve_arttir("sorgu")
-
+        genel_istatistik_arttir("sorgu")
         ogrenci_no = request.form.get("ogrenci_no", "").strip()
+
         if not ogrenci_no:
             hata = "Lütfen geçerli bir öğrenci numarası giriniz."
         elif ogrenci_no in sinav_verileri:
+            # Öğrenci sorgulandığında o öğrencinin sayaç bilgilerini veritabanında güncelle
+            try:
+                simdi = datetime.now().strftime("%d.%m.%Y %H:%M")
+                conn = db_baglantisi()
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    UPDATE ogrenciler 
+                    SET sorgu_sayisi = sorgu_sayisi + 1, son_sorgu_tarihi = %s 
+                    WHERE ogrenci_no = %s
+                    """,
+                    (simdi, ogrenci_no)
+                )
+                conn.commit()
+                cursor.close()
+                conn.close()
+            except Exception as e:
+                print(f"Öğrenci sayaç güncelleme hatası: {e}")
+
+            # Güncel veriyi tekrar çek
+            sinav_verileri = sinav_verilerini_getir()
             ham_veri = sinav_verileri[ogrenci_no]
             ters_sinavlar = list(reversed(ham_veri.get("sinavlar", [])))
             sonuc = {"ad": ham_veri["ad"], "sinavlar": ters_sinavlar}
@@ -208,7 +229,7 @@ def veli_sorgula():
 @app.route("/admin", methods=["GET", "POST"])
 def admin_panel():
     sinav_verileri = sinav_verilerini_getir()
-    toplam_ziyaret, toplam_sorgu = istatistikleri_oku()
+    toplam_ziyaret, toplam_sorgu = genel_istatistikleri_oku()
 
     if request.method == "POST":
         sifre = request.form.get("sifre", "").strip()
@@ -298,7 +319,8 @@ def ogrenci_kaydet():
 
             cursor.execute(
                 """
-                    INSERT INTO ogrenciler (ogrenci_no, ad) VALUES (%s, %s)
+                    INSERT INTO ogrenciler (ogrenci_no, ad, sorgu_sayisi, son_sorgu_tarihi) 
+                    VALUES (%s, %s, 0, '-')
                     ON CONFLICT (ogrenci_no) DO UPDATE SET ad = EXCLUDED.ad
                 """,
                 (ogrenci_no, ad),
@@ -414,7 +436,8 @@ def excel_yukle():
                 if no and no != "nan":
                     cursor.execute(
                         """
-                            INSERT INTO ogrenciler (ogrenci_no, ad) VALUES (%s, %s)
+                            INSERT INTO ogrenciler (ogrenci_no, ad, sorgu_sayisi, son_sorgu_tarihi) 
+                            VALUES (%s, %s, 0, '-')
                             ON CONFLICT (ogrenci_no) DO UPDATE SET ad = EXCLUDED.ad
                         """,
                         (no, ad),

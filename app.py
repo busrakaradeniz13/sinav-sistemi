@@ -17,7 +17,7 @@ from flask import (
 import pandas as pd
 
 app = Flask(__name__)
-app.secret_key = "uzman_ogretmen_guvenli_sistem_key_2026_v3"
+app.secret_key = "uzman_ogretmen_guvenli_sistem_key_2026_v4"
 
 ADMIN_PASSWORD = "15698"
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -129,15 +129,11 @@ def sinav_verilerini_getir():
     try:
         conn = db_baglantisi()
         cursor = conn.cursor()
-        # Numaraya göre küçükten büyüğe sırala (Azdan Çoğa)
-        cursor.execute("SELECT * FROM ogrenciler ORDER BY CAST(ogrenci_no AS INTEGER) ASC ON CONFLICT DO NOTHING")
-    except:
         try:
-            cursor.execute("SELECT * FROM ogrenciler ORDER BY ogrenci_no ASC")
+            cursor.execute("SELECT * FROM ogrenciler ORDER BY CAST(ogrenci_no AS INTEGER) ASC")
         except:
-            return {}
-
-    try:
+            cursor.execute("SELECT * FROM ogrenciler ORDER BY ogrenci_no ASC")
+            
         ogrenci_satirlari = cursor.fetchall()
         veriler = {}
         for ogrenci in ogrenci_satirlari:
@@ -165,7 +161,6 @@ def veli_sorgula():
     sonuc, hata = None, None
     en_son_derece = None
     
-    # Ziyaret sayısını artır
     try:
         conn = db_baglantisi()
         cursor = conn.cursor()
@@ -193,16 +188,15 @@ def veli_sorgula():
         if not ogrenci_no:
             hata = "Lütfen okul numarası giriniz."
         elif ogrenci_no in sinav_verileri:
-            # Sorgu sayısını ve Türkiye saati bilgisini güncelle
             try:
-                su an_tsi = datetime.now(TURKEY_TZ).strftime("%d.%m.%Y %H:%M")
+                su_an_tsi = datetime.now(TURKEY_TZ).strftime("%d.%m.%Y %H:%M")
                 conn = db_baglantisi()
                 cursor = conn.cursor()
                 cursor.execute("""
                     UPDATE ogrenciler 
                     SET sorgu_sayisi = sorgu_sayisi + 1, son_sorgu_tarihi = %s 
                     WHERE ogrenci_no = %s
-                """, (su an_tsi, ogrenci_no))
+                """, (su_an_tsi, ogrenci_no))
                 cursor.execute("UPDATE istatistikler SET toplam_sorgu = toplam_sorgu + 1 WHERE id = 1")
                 conn.commit()
                 cursor.close()

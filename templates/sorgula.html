@@ -5,12 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Öğrenci Sınav Sonuç Sorgulama - Büşra Güngör</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- KUTLAMA / KONFETİ EFEKTİ İÇİN KÜTÜPHANE -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 </head>
 <body class="bg-slate-900 min-h-screen text-slate-100 font-sans flex flex-col justify-between p-4 selection:bg-indigo-500 selection:text-white">
 
-    <!-- ÜST KISIM / BAŞLIK -->
     <header class="w-full max-w-xl mx-auto text-center pt-8 pb-4 space-y-2">
         <div class="inline-block bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 px-4 py-1.5 rounded-full text-xs font-bold tracking-wider uppercase shadow-sm">
             Büşra Güngör • Sınav ve Başarı Sistemi
@@ -23,10 +21,8 @@
         </p>
     </header>
 
-    <!-- ANA İÇERİK KUTUSU -->
     <main class="w-full max-w-xl mx-auto space-y-6">
         
-        <!-- SORGULAMA FORMU -->
         <div class="bg-slate-800/90 backdrop-blur-md p-6 sm:p-8 rounded-3xl border border-slate-700/80 shadow-2xl">
             <form method="POST" action="/" class="space-y-4">
                 <div>
@@ -36,9 +32,7 @@
                     <div class="relative">
                         <input type="text" name="ogrenci_no" required placeholder="Örn: 101" autofocus autocomplete="off"
                             class="w-full px-4 py-3.5 rounded-2xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-base shadow-inner">
-                        <div class="absolute right-3.5 top-3.5 text-slate-500 text-lg">
-                            🔍
-                        </div>
+                        <div class="absolute right-3.5 top-3.5 text-slate-500 text-lg">🔍</div>
                     </div>
                 </div>
 
@@ -49,18 +43,15 @@
             </form>
         </div>
 
-        <!-- HATA MESAJI -->
         {% if hata %}
         <div class="bg-rose-950/60 border border-rose-500/50 p-4 rounded-2xl text-rose-300 text-xs font-bold text-center shadow-lg animate-pulse">
             ⚠️ {{ hata }}
         </div>
         {% endif %}
 
-        <!-- SONUÇ EKRANI -->
         {% if sonuc %}
         <div class="bg-slate-800/90 backdrop-blur-md p-6 sm:p-8 rounded-3xl border border-slate-700/80 shadow-2xl space-y-6">
             
-            <!-- ÖĞRENCİ BİLGİ KARTI -->
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-700 pb-4 gap-2">
                 <div>
                     <span class="text-[10px] uppercase font-extrabold tracking-wider text-indigo-400 bg-indigo-500/10 px-2.5 py-1 rounded-md border border-indigo-500/20">Öğrenci Bilgisi</span>
@@ -80,7 +71,7 @@
                 </div>
             </div>
 
-            <!-- AKTİF ONLINE SINAVLAR (EĞER VARSA) -->
+            <!-- AKTİF ONLINE SINAVLAR -->
             {% if aktif_testler %}
             <div class="bg-indigo-950/50 border border-indigo-500/40 p-4 rounded-2xl space-y-3">
                 <div class="flex items-center gap-2">
@@ -104,7 +95,6 @@
             </div>
             {% endif %}
 
-            <!-- SINAV GEÇMİŞİ LİSTESİ -->
             <div class="space-y-3">
                 <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Sınav Sonuçları ve Karne Geçmişi</h3>
                 
@@ -116,7 +106,7 @@
                                 <span class="font-bold text-sm text-indigo-300">{{ s.sinav }}</span>
                                 <span class="bg-indigo-600 text-white text-xs font-extrabold px-3 py-1 rounded-xl shadow-sm">
                                     {{ s.puan }} Puan
-                                 </span>
+                                </span>
                             </div>
 
                             <div class="grid grid-cols-4 gap-2 text-center text-xs">
@@ -151,24 +141,16 @@
 
         </div>
 
-        <!-- EĞER ÖĞRENCİ DERECE YAPTIYSA (1, 2 veya 3) OTOMATİK KUTLAMA KONFETİSİ PATLAT -->
         {% if en_son_derece %}
         <script>
             window.addEventListener('DOMContentLoaded', () => {
-                // Şahane bir kutlama konfeti efekti
                 var duration = 3 * 1000;
                 var animationEnd = Date.now() + duration;
                 var defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
-
-                function randomInRange(min, max) {
-                    return Math.random() * (max - min) + min;
-                }
-
+                function randomInRange(min, max) { return Math.random() * (max - min) + min; }
                 var interval = setInterval(function() {
                     var timeLeft = animationEnd - Date.now();
-                    if (timeLeft <= 0) {
-                        return clearInterval(interval);
-                    }
+                    if (timeLeft <= 0) return clearInterval(interval);
                     var particleCount = 50 * (timeLeft / duration);
                     confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } }));
                     confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
@@ -181,7 +163,6 @@
 
     </main>
 
-    <!-- ALT BİLGİ -->
     <footer class="w-full max-w-xl mx-auto text-center py-6 text-xs text-slate-500">
         <p>© 2026 Büşra Güngör • Tüm Hakları Saklıdır.</p>
     </footer>

@@ -51,9 +51,68 @@
         </div>
         {% else %}
 
-        <!-- SORU EKLEME ALANI -->
-        <div class="bg-white p-6 sm:p-8 rounded-3xl border border-indigo-200 shadow-xl space-y-4">
-            <h2 class="text-lg font-black text-slate-900">Online Sınava Soru Ekle</h2>
+        <!-- MANUEL ÖĞRENCİ / KARNE EKLEME (AKILLI TANIMALI) -->
+        <div class="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xl space-y-4">
+            <h2 class="text-base font-black text-slate-900">Öğrenci Karne & Not Girişi</h2>
+            <form action="/admin/kaydet" method="POST" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <input type="text" id="ogrenci_no_input" name="ogrenci_no" required placeholder="Öğrenci No" onblur="ogrenciGetir()" class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold">
+                <input type="text" id="ad_input" name="ad" required placeholder="Ad Soyad (Otomatik gelir)" class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold">
+                <input type="text" name="sinav" required placeholder="Sınav Adı" class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold">
+                <input type="number" name="dogru" placeholder="Doğru Sayısı" class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs">
+                <input type="number" name="yanlis" placeholder="Yanlış Sayısı" class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs">
+                <input type="number" name="bos" placeholder="Boş Sayısı" class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs">
+                <input type="number" name="puan" placeholder="Puan" class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs">
+                <input type="text" name="derece" placeholder="Derece (1, 2, 3)" class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs">
+                <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs sm:col-span-3">Kaydet / Güncelle 💾</button>
+            </form>
+        </div>
+
+        <!-- TÜM ÖĞRENCİLERİN SINAV SONUÇLARI VE DETAYLI LİSTESİ -->
+        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-xl space-y-4">
+            <h3 class="text-sm font-black text-slate-900">Tüm Öğrenciler ve Sınav Sonuçları (Numara Sıralı)</h3>
+            
+            {% if veriler %}
+            <div class="space-y-4 max-h-[500px] overflow-y-auto pr-1">
+                {% for no, bilgi in veriler.items() %}
+                <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
+                    <div class="flex justify-between items-center border-b border-slate-200 pb-2">
+                        <div>
+                            <span class="font-black text-indigo-700 text-sm">No: {{ no }}</span>
+                            <span class="font-bold text-slate-900 text-sm ml-2">- {{ bilgi.ad }}</span>
+                        </div>
+                        <a href="/admin/ogrenci-sil/{{ no }}" onclick="return confirm('Öğrenciyi ve tüm sınavlarını silmek istediğinize emin misiniz?')" class="text-rose-600 text-xs font-bold hover:underline">Öğrenciyi Sil 🗑️</a>
+                    </div>
+
+                    {% if bilgi.sinavlar %}
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {% for s in bilgi.sinavlar %}
+                        <div class="bg-white p-3 rounded-xl border border-slate-200 text-xs flex justify-between items-center">
+                            <div>
+                                <div class="font-bold text-slate-800">{{ s.sinav }}</div>
+                                <div class="text-[11px] text-slate-500">D: {{ s.dogru }} | Y: {{ s.yanlis }} | B: {{ s.bos }} | Puan: <strong class="text-indigo-600">{{ s.puan }}</strong> {% if s.derece %}| Sıra: <strong class="text-amber-600">{{ s.derece }}</strong>{% endif %}</div>
+                            </div>
+                            <a href="/admin/sinav-sil/{{ no }}/{{ s.sinav }}" onclick="return confirm('Bu sınav sonucunu silmek istiyor musunuz?')" class="text-rose-500 hover:text-rose-700 font-bold ml-2">Sil</a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-xs text-slate-400 italic">Kayıtlı sınav sonucu yok.</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-xs text-slate-400">Henüz veritabanında öğrenci bulunmuyor.</div>
+            {% endif %}
+        </div>
+
+        <!-- SEKMELİ / AYRI BÖLÜM: ONLINE SINAV VE SORU YÖNETİMİ -->
+        <div class="bg-white p-6 sm:p-8 rounded-3xl border border-indigo-200 shadow-xl space-y-6">
+            <div class="border-b border-slate-100 pb-3">
+                <span class="bg-indigo-50 text-indigo-700 text-xs font-bold px-2.5 py-1 rounded-md border border-indigo-100">Özel Soru Modülü</span>
+                <h2 class="text-lg font-black text-slate-900 mt-1">Online Sınav Hazırla & Soru Ekle</h2>
+            </div>
+
             <form action="/admin/soru-ekle" method="POST" class="space-y-4">
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
@@ -67,7 +126,7 @@
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-600 mb-1">Soru Metni</label>
-                    <textarea name="soru_metni" rows="2" required placeholder="Soru yazın..." class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs"></textarea>
+                    <textarea name="soru_metni" rows="2" required placeholder="Soru cümlesini buraya yazın..." class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs"></textarea>
                 </div>
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     <input type="text" name="secenek_a" required placeholder="A Şıkkı" class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs">
@@ -77,76 +136,70 @@
                 </div>
                 <div class="flex justify-between items-center">
                     <select name="dogru_cevap" class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold">
-                        <option value="A">Doğru: A</option><option value="B">Doğru: B</option><option value="C">Doğru: C</option><option value="D">Doğru: D</option>
+                        <option value="A">Doğru Cevap: A</option>
+                        <option value="B">Doğru Cevap: B</option>
+                        <option value="C">Doğru Cevap: C</option>
+                        <option value="D">Doğru Cevap: D</option>
                     </select>
-                    <button type="submit" class="bg-indigo-600 text-white font-bold px-6 py-2.5 rounded-xl text-xs shadow">➕ Yeni Soru Ekle</button>
+                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-2.5 rounded-xl text-xs shadow">➕ Soruyu Kaydet</button>
                 </div>
             </form>
-        </div>
 
-        <!-- TESTLER VE YAYINLA -->
-        {% if test_listesi %}
-        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-xl space-y-3">
-            <h3 class="text-sm font-bold text-slate-900">Sınav Yayın Yönetimi</h3>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {% for test in test_listesi %}
-                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 flex justify-between items-center">
-                    <div>
-                        <div class="text-xs font-bold text-slate-800">{{ test.test_adi }}</div>
-                        <div class="text-[10px] text-slate-500">Süre: {{ test.sure_dakika }} dk</div>
+            <!-- TEST YAYIN DURUMU -->
+            {% if test_listesi %}
+            <div class="pt-4 border-t border-slate-100">
+                <h3 class="text-xs font-bold text-slate-700 mb-2">Sınav Yayın Durumu</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {% for test in test_listesi %}
+                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 flex justify-between items-center">
+                        <div>
+                            <div class="text-xs font-bold text-slate-800">{{ test.test_adi }}</div>
+                            <div class="text-[10px] text-slate-500">Süre: {{ test.sure_dakika }} dk</div>
+                        </div>
+                        <a href="/admin/test-yayinla/{{ test.test_adi }}" class="px-3 py-1.5 rounded-xl text-xs font-bold {% if test.yayinlandi %}bg-emerald-600 text-white{% else %}bg-amber-500 text-white{% endif %}">
+                            {% if test.yayinlandi %}Yayında (Kaldır){% else %}Yayına Al 🚀{% endif %}
+                        </a>
                     </div>
-                    <a href="/admin/test-yayinla/{{ test.test_adi }}" class="px-3 py-1.5 rounded-xl text-xs font-bold {% if test.yayinlandi %}bg-emerald-600 text-white{% else %}bg-amber-500 text-white{% endif %}">
-                        {% if test.yayinlandi %}Yayında (Kaldır){% else %}Yayına Al{% endif %}
-                    </a>
+                    {% endfor %}
                 </div>
-                {% endfor %}
             </div>
-        </div>
-        {% endif %}
+            {% endif %}
 
-        <!-- MANUEL ÖĞRENCİ EKLEME (AKILLI TANIMA) -->
-        <div class="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xl space-y-4">
-            <h2 class="text-base font-black text-slate-900">Manuel Karne / Not Ekle</h2>
-            <form action="/admin/kaydet" method="POST" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <input type="text" id="ogrenci_no_input" name="ogrenci_no" required placeholder="Öğrenci No" onblur="ogrenciGetir()" class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold">
-                <input type="text" id="ad_input" name="ad" required placeholder="Ad Soyad (Otomatik gelir)" class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold">
-                <input type="text" name="sinav" required placeholder="Sınav Adı" class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold">
-                <input type="number" name="dogru" placeholder="Doğru" class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs">
-                <input type="number" name="yanlis" placeholder="Yanlış" class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs">
-                <input type="number" name="bos" placeholder="Boş" class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs">
-                <input type="number" name="puan" placeholder="Puan" class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs">
-                <input type="text" name="derece" placeholder="Derece (1, 2, 3)" class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs">
-                <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs sm:col-span-3">Kaydet / Güncelle 💾</button>
-            </form>
+            <!-- KAYITLI SORULAR -->
+            {% if tum_sorular %}
+            <div class="pt-4 border-t border-slate-100 space-y-2">
+                <h3 class="text-xs font-bold text-slate-700">Eklenen Sorular</h3>
+                <div class="space-y-2 max-h-60 overflow-y-auto">
+                    {% for soru in tum_sorular %}
+                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 flex justify-between items-start text-xs">
+                        <div>
+                            <span class="bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-0.5 rounded">{{ soru.test_adi }}</span>
+                            <p class="font-bold text-slate-800 mt-1">{{ soru.soru_metni }}</p>
+                            <div class="text-[10px] text-slate-500">A: {{ soru.secenek_a }} | B: {{ soru.secenek_b }} | C: {{ soru.secenek_c }} | D: {{ soru.secenek_d }} | Doğru: <strong class="text-emerald-600">{{ soru.dogru_cevap }}</strong></div>
+                        </div>
+                        <a href="/admin/soru-sil/{{ soru.id }}" onclick="return confirm('Soruyu silmek istediğinize emin misiniz?')" class="text-rose-600 font-bold hover:underline ml-2">Sil 🗑️</a>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
         </div>
 
-        <!-- EXCEL YÜKLEME VE İNDİRME -->
+        <!-- EXCEL AKTARIM & YEDEKLEME -->
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-xl space-y-3">
-                <h3 class="text-xs font-bold text-slate-900">Excel Toplu Yükleme</h3>
+                <h3 class="text-xs font-bold text-slate-900">Excel Toplu Veri Yükleme</h3>
                 <form action="/admin/excel-yukle" method="POST" enctype="multipart/form-data" class="space-y-2">
                     <input type="file" name="excel_dosya" required class="block w-full text-xs text-slate-500 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-slate-100 file:text-slate-700">
-                    <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-2 rounded-xl text-xs">Excel Yükle 📊</button>
+                    <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-2 rounded-xl text-xs">Excel Aktar 📊</button>
                 </form>
             </div>
             <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-xl flex flex-col justify-between space-y-3">
-                <h3 class="text-xs font-bold text-slate-900">Yedek İndir</h3>
+                <h3 class="text-xs font-bold text-slate-900">Excel Yedek İndir</h3>
                 <a href="/admin/excel-indir" class="block text-center bg-indigo-600 text-white font-bold py-2.5 rounded-xl text-xs">Excel Raporu İndir 📥</a>
             </div>
         </div>
 
-        <!-- KAYITLI ÖĞRENCİLER ARŞİVİ (NUMARAYA GÖRE SIRALI) -->
-        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-xl space-y-3">
-            <h3 class="text-sm font-bold text-slate-900">Kayıtlı Öğrenci Arşivi (Numara Sıralı)</h3>
-            <div class="space-y-2 max-h-80 overflow-y-auto">
-                {% for no, b in veriler.items() %}
-                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 flex justify-between items-center text-xs">
-                    <div><strong>{{ no }}</strong> - {{ b.ad }}</div>
-                    <a href="/admin/ogrenci-sil/{{ no }}" onclick="return confirm('Öğrenciyi silmek istiyor musunuz?')" class="text-rose-600 font-bold hover:underline">Sil 🗑️</a>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
         {% endif %}
     </div>
 </body>

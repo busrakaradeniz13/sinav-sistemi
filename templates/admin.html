@@ -6,7 +6,6 @@
     <title>Öğretmen Yönetim Paneli</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-        // Numara yazılınca adı otomatik getir
         function ogrenciGetirNo() {
             let no = document.getElementById('ogrenci_no_input').value.trim();
             if(!no) return;
@@ -19,7 +18,6 @@
                 });
         }
 
-        // Açılır listeden isim seçilince numarayı otomatik getir
         function ogrenciSecAd(selectElement) {
             let selectedOption = selectElement.options[selectElement.selectedIndex];
             let no = selectedOption.getAttribute('data-no');
@@ -145,10 +143,10 @@
             <button id="btn-tab-excel" onclick="tabAc('tab-excel')" class="tab-btn bg-white text-slate-700 border border-slate-300 px-5 py-2.5 rounded-2xl text-xs font-bold transition shadow-sm">📊 Excel & Yedekleme</button>
         </div>
 
-        <!-- 1. BÖLÜM -->
+        <!-- 1. BÖLÜM: KAYITLI ÖĞRENCİLER -->
         <div id="tab-ogrenciler" class="tab-icerik bg-white p-6 rounded-3xl border border-slate-200 shadow-xl space-y-4">
             <h3 class="text-base font-black text-slate-900">Kayıtlı Öğrenciler (Numara Sıralı - Tıklayınca Açılır)</h3>
-            <p class="text-xs text-slate-500">Öğrenciye tıklayarak tüm sınav sonuçlarını görebilirsiniz.</p>
+            <p class="text-xs text-slate-500">Öğrenciye tıklayarak tüm sınav sonuçlarını (en yeni en üstte) görebilirsiniz.</p>
 
             {% if veriler %}
             <div class="space-y-3 max-h-[600px] overflow-y-auto pr-1">
@@ -194,13 +192,12 @@
             {% endif %}
         </div>
 
-        <!-- 2. BÖLÜM: ÖĞRENCİ VE NOT EKLE (AÇILIR LİSTE VE OTOMATİK TANIMA) -->
+        <!-- 2. BÖLÜM: ÖĞRENCİ VE NOT EKLE (KAYITLI DERS SEÇENEKLİ) -->
         <div id="tab-ekle" class="tab-icerik hidden bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xl space-y-4">
             <h2 class="text-base font-black text-slate-900">Öğrenci & Not Ekle / Güncelle</h2>
             <form action="/admin/kaydet" method="POST" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <input type="text" id="ogrenci_no_input" name="ogrenci_no" required placeholder="Öğrenci No" onblur="ogrenciGetirNo()" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold">
                 
-                <!-- İSTER YAZIN İSTER LİSTEDEN SEÇİN (AÇILIR KUTU) -->
                 <div class="relative">
                     <select id="ad_select" onchange="ogrenciSecAd(this)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10">
                         <option value="">-- Listeden Seç --</option>
@@ -211,7 +208,17 @@
                     <input type="text" id="ad_input" name="ad" required placeholder="Ad Soyad veya Listeden Seç ▾" onblur="ogrenciGetirNo()" class="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold">
                 </div>
 
-                <input type="text" name="sinav" required placeholder="Sınav Adı" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold">
+                <!-- DERS / SINAV ADI (KAYITLI LİSTEDEN SEÇME VEYA YAZMA) -->
+                <div class="relative">
+                    <select onchange="document.getElementById('sinav_input').value=this.value;" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10">
+                        <option value="">-- Kayıtlı Sınavlar / Dersler --</option>
+                        {% for d in kayitli_dersler %}
+                        <option value="{{ d }}">{{ d }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="text" id="sinav_input" name="sinav" required placeholder="Sınav Adı (Yaz veya Seç ▾)" class="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold">
+                </div>
+
                 <input type="number" name="dogru" placeholder="Doğru Sayısı" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs">
                 <input type="number" name="yanlis" placeholder="Yanlış Sayısı" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs">
                 <input type="number" name="bos" placeholder="Boş Sayısı" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs">
@@ -221,7 +228,7 @@
             </form>
         </div>
 
-        <!-- 3. BÖLÜM -->
+        <!-- 3. BÖLÜM: ÇOKLU SORU VE YAYINDAN KALDIR TUŞU -->
         <div id="tab-sinavlar" class="tab-icerik hidden bg-white p-6 sm:p-8 rounded-3xl border border-indigo-200 shadow-xl space-y-6">
             <div class="border-b border-slate-100 pb-3">
                 <h2 class="text-lg font-black text-slate-900">Çoklu Soru Ekleme & Online Sınav Yönetimi</h2>
@@ -271,7 +278,7 @@
 
             {% if test_listesi %}
             <div class="pt-4 border-t border-slate-100">
-                <h3 class="text-xs font-bold text-slate-700 mb-2">Yayınlanmış Testler</h3>
+                <h3 class="text-xs font-bold text-slate-700 mb-2">Yayın Durumu & Yayından Kaldırma</h3>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {% for test in test_listesi %}
                     <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 flex justify-between items-center">
@@ -279,8 +286,8 @@
                             <div class="text-xs font-bold text-slate-800">{{ test.test_adi }}</div>
                             <div class="text-[10px] text-slate-500">Süre: {{ test.sure_dakika }} dk</div>
                         </div>
-                        <a href="/admin/test-yayinla/{{ test.test_adi }}" class="px-3 py-1.5 rounded-xl text-xs font-bold {% if test.yayinlandi %}bg-emerald-600 text-white{% else %}bg-amber-500 text-white{% endif %}">
-                            {% if test.yayinlandi %}Yayında (Kaldır){% else %}Yayına Al 🚀{% endif %}
+                        <a href="/admin/test-yayinla/{{ test.test_adi }}" class="px-3 py-1.5 rounded-xl text-xs font-bold {% if test.yayinlandi %}bg-rose-600 text-white hover:bg-rose-700{% else %}bg-emerald-600 text-white hover:bg-emerald-700{% endif %}">
+                            {% if test.yayinlandi %}Yayından Kaldır 🛑{% else %}Yayına Al 🚀{% endif %}
                         </a>
                     </div>
                     {% endfor %}
@@ -289,7 +296,7 @@
             {% endif %}
         </div>
 
-        <!-- 4. BÖLÜM -->
+        <!-- 4. BÖLÜM: EXCEL -->
         <div id="tab-excel" class="tab-icerik hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-xl space-y-3">
                 <h3 class="text-xs font-bold text-slate-900">Excel Toplu Veri Yükleme</h3>

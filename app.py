@@ -20,7 +20,7 @@ import pypdf
 import docx
 
 app = Flask(__name__)
-app.secret_key = "uzman_ogretmen_guvenli_sistem_key_2026_v9"
+app.secret_key = "uzman_ogretmen_guvenli_sistem_key_2026_v11"
 
 ADMIN_PASSWORD = "15698"
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -351,6 +351,22 @@ def admin_panel():
 def admin_cikis():
     session.clear()
     return redirect(url_for("admin_panel"))
+
+@app.route("/admin/sayaclari-sifirla")
+def sayaclari_sifirla():
+    if not session.get("admin_logged_in"): return redirect(url_for("admin_panel"))
+    try:
+        conn = db_baglantisi()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE istatistikler SET toplam_ziyaret = 0, toplam_sorgu = 0 WHERE id = 1")
+        cursor.execute("UPDATE ogrenciler SET sorgu_sayisi = 0")
+        conn.commit()
+        cursor.close()
+        conn.close()
+        flash("Tüm sayaçlar ve öğrenci sorgu sayıları başarıyla sıfırlandı!", "success")
+    except Exception as e:
+        flash(f"Sıfırlama hatası: {e}", "error")
+    return redirect(url_for("admin_panel", tab="tab-ogrenciler"))
 
 @app.route("/admin/coklu-soru-ekle", methods=["POST"])
 def coklu_soru_ekle():

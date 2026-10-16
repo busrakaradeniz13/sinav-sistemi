@@ -192,20 +192,21 @@
             {% endif %}
         </div>
 
-        <!-- 2. BÖLÜM -->
+        <!-- 2. BÖLÜM: ÖĞRENCİ & NOT EKLE (SERBEST İSİM YAZMA & SEÇMELİ DROPDOWN) -->
         <div id="tab-ekle" class="tab-icerik hidden bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xl space-y-4">
             <h2 class="text-base font-black text-slate-900">Öğrenci & Not Ekle / Güncelle</h2>
             <form action="/admin/kaydet" method="POST" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <input type="text" id="ogrenci_no_input" name="ogrenci_no" required placeholder="Öğrenci No" onblur="ogrenciGetirNo()" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold">
                 
-                <div class="relative">
-                    <select id="ad_select" onchange="ogrenciSecAd(this)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10">
-                        <option value="">-- Listeden Seç --</option>
+                <!-- Serbest yazı yazılabilen ve yandaki butondan eski öğrencilerin seçilebildiği alan -->
+                <div class="flex gap-1">
+                    <input type="text" id="ad_input" name="ad" required placeholder="Ad Soyad (Yeni yazabilirsin)" onblur="ogrenciGetirNo()" class="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold">
+                    <select onchange="ogrenciSecAd(this)" title="Kayıtlı Öğrencilerden Seç" class="bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-xl px-2 text-xs cursor-pointer font-bold">
+                        <option value="">Kayıtlı Seç ▾</option>
                         {% for no, b in veriler.items() %}
                         <option value="{{ b.ad }}" data-no="{{ no }}">{{ no }} - {{ b.ad }}</option>
                         {% endfor %}
                     </select>
-                    <input type="text" id="ad_input" name="ad" required placeholder="Ad Soyad veya Listeden Seç ▾" onblur="ogrenciGetirNo()" class="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold">
                 </div>
 
                 <div class="relative">
@@ -227,7 +228,7 @@
             </form>
         </div>
 
-        <!-- 3. BÖLÜM: ÇOKLU SORU & DOSYADAN SORU YÜKLEME & SINAV SİL -->
+        <!-- 3. BÖLÜM -->
         <div id="tab-sinavlar" class="tab-icerik hidden bg-white p-6 sm:p-8 rounded-3xl border border-indigo-200 shadow-xl space-y-6">
             <div class="border-b border-slate-100 pb-3">
                 <h2 class="text-lg font-black text-slate-900">Çoklu Soru Ekleme & Online Sınav Yönetimi</h2>

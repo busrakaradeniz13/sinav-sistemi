@@ -3,100 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Online Sınav - {{ test_adi }}</title>
+    <title>Sınav - {{ test_adi }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-slate-900 min-h-screen text-slate-100 font-sans flex flex-col justify-between p-4">
-
-    <header class="max-w-3xl w-full mx-auto bg-slate-800 p-4 rounded-2xl border border-slate-700 flex justify-between items-center shadow-lg">
+<body class="bg-slate-50 min-h-screen text-slate-800 font-sans flex flex-col justify-between p-4">
+    <header class="max-w-3xl w-full mx-auto bg-white p-4 rounded-2xl border border-slate-200 flex justify-between items-center shadow-md">
         <div>
-            <h1 class="text-base font-bold text-indigo-400">{{ test_adi }}</h1>
-            <p class="text-xs text-slate-400">Öğrenci: <span class="text-white font-bold">{{ ogrenci.ad }}</span> (No: {{ ogrenci_no }})</p>
+            <h1 class="text-base font-bold text-indigo-700">{{ test_adi }}</h1>
+            <p class="text-xs text-slate-500">Öğrenci: <span class="text-slate-900 font-bold">{{ ogrenci.ad }}</span> (No: {{ ogrenci_no }})</p>
         </div>
-        
-        <div class="bg-rose-950/80 border border-rose-500 px-4 py-2 rounded-xl text-rose-300 flex items-center gap-2 shadow-inner">
-            <span class="text-xs uppercase font-bold tracking-wider">Kalan Süre:</span>
+        <div class="bg-rose-50 border border-rose-200 px-4 py-2 rounded-xl text-rose-700 flex items-center gap-2 shadow-inner">
+            <span class="text-xs uppercase font-bold">Kalan Süre:</span>
             <span id="sayac" class="text-lg font-black font-mono">00:00</span>
         </div>
     </header>
 
     <main class="max-w-3xl w-full mx-auto my-6">
-        {% if daha_once_cozmus %}
-        <div class="bg-amber-950/50 border border-amber-500 p-6 rounded-2xl text-center space-y-4">
-            <h2 class="text-xl font-bold text-amber-300">Bu Sınavı Zaten Tamamladınız!</h2>
-            <p class="text-sm text-slate-300">Bu sınava daha önce katıldığınız için tekrar giriş yapamazsınız.</p>
-            <a href="/" class="inline-block bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-2.5 rounded-xl text-xs transition">
-                Ana Sayfaya Dön
-            </a>
+        {% if daha_once %}
+        <div class="bg-amber-50 border border-amber-200 p-6 rounded-2xl text-center space-y-4 shadow-sm">
+            <h2 class="text-xl font-bold text-amber-800">Bu Sınavı Zaten Tamamladınız!</h2>
+            <a href="/" class="inline-block bg-indigo-600 text-white font-bold px-6 py-2.5 rounded-xl text-xs">Ana Sayfaya Dön</a>
         </div>
         {% elif not sorular %}
-        <div class="bg-slate-800 p-8 rounded-2xl text-center space-y-3 border border-slate-700">
-            <h2 class="text-lg font-bold text-slate-300">Bu testte henüz soru bulunmuyor.</h2>
-            <a href="/" class="inline-block bg-indigo-600 text-white px-5 py-2 rounded-xl text-xs font-bold">Geri Dön</a>
+        <div class="bg-white p-8 rounded-2xl text-center shadow border border-slate-200">
+            <h2 class="text-sm font-bold text-slate-600">Bu testte soru bulunmuyor.</h2>
         </div>
         {% else %}
         <form id="sinavFormu" method="POST" class="space-y-6">
-            
             {% for soru in sorular %}
-            <div class="soru-kutusu {% if not loop.first %}hidden{% endif %} bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl space-y-5" data-index="{{ loop.index0 }}">
-                
-                <div class="flex justify-between items-center border-b border-slate-700 pb-3">
-                    <span class="bg-indigo-600 text-white text-xs font-extrabold px-3 py-1 rounded-full">
-                        Soru {{ loop.index }} / {{ sorular|length }}
-                    </span>
-                    <span class="text-[11px] text-slate-400">İstediğiniz sorudan başlayabilirsiniz</span>
+            <div class="soru-kutusu {% if not loop.first %}hidden{% endif %} bg-white p-6 rounded-2xl border border-slate-200 shadow-xl space-y-5" data-index="{{ loop.index0 }}">
+                <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                    <span class="bg-indigo-600 text-white text-xs font-bold px-3 py-1 rounded-full">Soru {{ loop.index }} / {{ sorular|length }}</span>
                 </div>
-
-                <div class="text-base font-semibold text-slate-100 leading-relaxed">
-                    {{ soru.soru_metni }}
-                </div>
-
+                <div class="text-base font-semibold text-slate-900 leading-relaxed">{{ soru.soru_metni }}</div>
                 <div class="space-y-3">
-                    <label class="flex items-center gap-3 p-3.5 rounded-xl border border-slate-700 bg-slate-900/50 hover:bg-slate-700/50 cursor-pointer transition">
-                        <input type="radio" name="soru_{{ soru.id }}" value="A" class="w-4 h-4 text-indigo-600 focus:ring-indigo-500">
-                        <span class="text-sm font-medium"><strong class="text-indigo-400 mr-2">A)</strong> {{ soru.secenek_a }}</span>
+                    {% for sec, harf in [(soru.secenek_a, 'A'), (soru.secenek_b, 'B'), (soru.secenek_c, 'C'), (soru.secenek_d, 'D')] %}
+                    <label class="flex items-center gap-3 p-3.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 cursor-pointer transition">
+                        <input type="radio" name="soru_{{ soru.id }}" value="{{ harf }}" class="w-4 h-4 text-indigo-600">
+                        <span class="text-sm font-medium"><strong class="text-indigo-600 mr-2">{{ harf }})</strong> {{ sec }}</span>
                     </label>
-
-                    <label class="flex items-center gap-3 p-3.5 rounded-xl border border-slate-700 bg-slate-900/50 hover:bg-slate-700/50 cursor-pointer transition">
-                        <input type="radio" name="soru_{{ soru.id }}" value="B" class="w-4 h-4 text-indigo-600 focus:ring-indigo-500">
-                        <span class="text-sm font-medium"><strong class="text-indigo-400 mr-2">B)</strong> {{ soru.secenek_b }}</span>
-                    </label>
-
-                    <label class="flex items-center gap-3 p-3.5 rounded-xl border border-slate-700 bg-slate-900/50 hover:bg-slate-700/50 cursor-pointer transition">
-                        <input type="radio" name="soru_{{ soru.id }}" value="C" class="w-4 h-4 text-indigo-600 focus:ring-indigo-500">
-                        <span class="text-sm font-medium"><strong class="text-indigo-400 mr-2">C)</strong> {{ soru.secenek_c }}</span>
-                    </label>
-
-                    <label class="flex items-center gap-3 p-3.5 rounded-xl border border-slate-700 bg-slate-900/50 hover:bg-slate-700/50 cursor-pointer transition">
-                        <input type="radio" name="soru_{{ soru.id }}" value="D" class="w-4 h-4 text-indigo-600 focus:ring-indigo-500">
-                        <span class="text-sm font-medium"><strong class="text-indigo-400 mr-2">D)</strong> {{ soru.secenek_d }}</span>
-                    </label>
+                    {% endfor %}
                 </div>
-
             </div>
             {% endfor %}
 
-            <div class="flex justify-between items-center bg-slate-800 p-4 rounded-2xl border border-slate-700">
-                <button type="button" id="geriBtn" onclick="soruDegistir(-1)" disabled
-                    class="bg-slate-700 hover:bg-slate-600 text-white font-bold px-5 py-2.5 rounded-xl text-xs transition disabled:opacity-30 disabled:cursor-not-allowed">
-                    ⬅️ Önceki Soru
-                </button>
-
-                <div class="text-xs text-slate-400 font-bold" id="sayfaGosterge">
-                    1 / {{ sorular|length }}
-                </div>
-
-                <button type="button" id="ileriBtn" onclick="soruDegistir(1)" 
-                    class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 py-2.5 rounded-xl text-xs transition">
-                    Sonraki Soru ➡️
-                </button>
-
-                <button type="submit" id="bitirBtn" onclick="return confirm('Sınavı bitirmek istediğinize emin misiniz?')" 
-                    class="hidden bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-2.5 rounded-xl text-xs transition shadow-lg">
-                    Sınavı Bitir ve Gönder 🚀
-                </button>
+            <div class="flex justify-between items-center bg-white p-4 rounded-2xl border border-slate-200 shadow-md">
+                <button type="button" id="geriBtn" onclick="soruDegistir(-1)" disabled class="bg-slate-200 text-slate-700 font-bold px-5 py-2.5 rounded-xl text-xs disabled:opacity-30">⬅️ Önceki</button>
+                <div class="text-xs text-slate-500 font-bold" id="sayfaGosterge">1 / {{ sorular|length }}</div>
+                <button type="button" id="ileriBtn" onclick="soruDegistir(1)" class="bg-indigo-600 text-white font-bold px-5 py-2.5 rounded-xl text-xs">Sonraki ➡️</button>
+                <button type="submit" id="bitirBtn" onclick="return confirm('Sınavı bitirmek istiyor musunuz?')" class="hidden bg-emerald-600 text-white font-bold px-6 py-2.5 rounded-xl text-xs shadow">Sınavı Bitir 🚀</button>
             </div>
-
         </form>
         {% endif %}
     </main>
@@ -104,49 +60,31 @@
     <script>
         let toplamSoru = {{ sorular|length if sorular else 0 }};
         let simdikiIndex = 0;
-
-        function soruDegistir( yon ) {
+        function soruDegistir(yon) {
             const kutular = document.querySelectorAll('.soru-kutusu');
-            if (kutular.length === 0) return;
-
+            if (!kutular.length) return;
             kutular[simdikiIndex].classList.add('hidden');
             simdikiIndex += yon;
-
             if (simdikiIndex < 0) simdikiIndex = 0;
             if (simdikiIndex >= toplamSoru) simdikiIndex = toplamSoru - 1;
-
             kutular[simdikiIndex].classList.remove('hidden');
-
             document.getElementById('geriBtn').disabled = (simdikiIndex === 0);
             document.getElementById('sayfaGosterge').innerText = `${simdikiIndex + 1} / ${toplamSoru}`;
-            
-            const ileriBtn = document.getElementById('ileriBtn');
-            const bitirBtn = document.getElementById('bitirBtn');
-
-            if (simdikiIndex === toplamSoru - 1) {
-                ileriBtn.classList.add('hidden');
-                bitirBtn.classList.remove('hidden');
-            } else {
-                ileriBtn.classList.remove('hidden');
-                bitirBtn.classList.add('hidden');
-            }
+            document.getElementById('ileriBtn').classList.toggle('hidden', simdikiIndex === toplamSoru - 1);
+            document.getElementById('bitirBtn').classList.toggle('hidden', simdikiIndex !== toplamSoru - 1);
         }
-
-        let sureDakika = {{ sure if sure else 30 }};
-        let toplamSaniye = sureDakika * 60;
-        const sayacElementi = document.getElementById('sayac');
-
+        let toplamSaniye = {{ sure if sure else 30 }} * 60;
+        const sayac = document.getElementById('sayac');
         const timer = setInterval(() => {
             if (toplamSaniye <= 0) {
                 clearInterval(timer);
-                alert("Süreniz bitti! Sınavınız otomatik olarak gönderiliyor.");
+                alert("Süreniz bitti! Gönderiliyor...");
                 document.getElementById('sinavFormu').submit();
                 return;
             }
             toplamSaniye--;
-            let dk = Math.floor(toplamSaniye / 60);
-            let sn = toplamSaniye % 60;
-            sayacElementi.innerText = `${dk.toString().padStart(2, '0')}:${sn.toString().padStart(2, '0')}`;
+            let dk = Math.floor(toplamSaniye / 60), sn = toplamSaniye % 60;
+            sayac.innerText = `${dk.toString().padStart(2,'0')}:${sn.toString().padStart(2,'0')}`;
         }, 1000);
     </script>
 </body>

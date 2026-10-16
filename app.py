@@ -1,5 +1,6 @@
 import io
 import os
+import re
 from datetime import datetime, timezone, timedelta
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -15,9 +16,11 @@ from flask import (
     url_for,
 )
 import pandas as pd
+import pypdf
+import docx
 
 app = Flask(__name__)
-app.secret_key = "uzman_ogretmen_guvenli_sistem_key_2026_v7"
+app.secret_key = "uzman_ogretmen_guvenli_sistem_key_2026_v8"
 
 ADMIN_PASSWORD = "15698"
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -137,10 +140,9 @@ def sinav_verilerini_getir():
         ogrenci_satirlari = cursor.fetchall()
         veriler = {}
         for ogrenci in ogrenci_satirlari:
-            no = str(ogrenci["ogrenci_no"]).strip()
+            no = ogrenci["ogrenci_no"]
             ad = ogrenci["ad"]
             
-            # En son eklenen sınav en üstte (id DESC)
             cursor.execute("SELECT * FROM sinavlar WHERE ogrenci_no = %s ORDER BY id DESC", (no,))
             sinavlar = [dict(s) for s in cursor.fetchall()]
 
@@ -225,10 +227,9 @@ def veli_sorgula():
             ham = sinav_verileri[ogrenci_no]
             sonuc = {"ogrenci_no": ogrenci_no, "ad": ham["ad"], "sinavlar": ham["sinavlar"]}
             
-            # SADECE EN SON SINAV DERECE KONTROLÜ (1, 2 veya 3 ise)
-            if ham["sinavlar"] and len(ham["sinavlar"]) > 0:
-                en_son_sinav = ham["sinavlar"][0]
-                d = str(en_son_sinav.get("derece", "")).replace(".", "").strip().lower()
+            if ham["sinavlar"]:
+                son_sinav = ham["sinavlar"][0]
+                d = str(son_sinav.get("derece", "")).replace(".", "").strip().lower()
                 if d in ["1", "2", "3"]:
                     en_son_derece = d
         else:
@@ -357,19 +358,62 @@ def coklu_soru_ekle():
     
     test_adi = request.form.get("test_adi", "").strip()
     sure = int(request.form.get("sure", 30))
-    soru_sayisi = int(request.form.get("soru_sayisi", 1))
+    soru_dosyasi = request.files.get("soru_dosyasi")
 
-    if test_adi and soru_sayisi > 0:
-        try:
-            conn = db_baglantisi()
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO test_ayarlari (test_adi, sure_dakika, yayinlandi) 
-                VALUES (%s, %s, FALSE) 
-                ON CONFLICT (test_adi) DO UPDATE SET sure_dakika = EXCLUDED.sure_dakika
-            """, (test_adi, sure))
+    if not test_adi:
+        flash("Lütfen test adı giriniz.", "error")
+        return redirect(url_for("admin_panel", tab="tab-sinavlar"))
 
-            eklenen = 0
+    try:
+        conn = db_baglantisi()
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO test_ayarlari (test_adi, sure_dakika, yayinlandi) 
+            VALUES (%s, %s, FALSE) 
+            ON CONFLICT (test_adi) DO UPDATE SET sure_dakika = EXCLUDED.sure_dakika
+        """, (test_adi, sure))
+
+        eklenen = 0
+
+        # DOSYADAN SORU OKUMA (PDF veya DOCX)
+        if soru_dosyasi and soru_dosyasi.filename:
+            dosya_adi = soru_dosyasi.filename.lower()
+            tam_metin = ""
+            
+            if dosya_adi.endswith(".pdf"):
+                reader = pypdf.PdfReader(soru_dosyasi)
+                for sayfa in reader.pages:
+                    t = sayfa.extract_text()
+                    if t: tam_metin += t + "\n"
+            elif dosya_adi.endswith(".docx"):
+                doc = docx.Document(soru_dosyasi)
+                for p in doc.paragraphs:
+                    if p.text: tam_metin += p.text + "\n"
+
+            # Basit akıllı soru ayrıştırıcı (1. Soru / Soru 1 kalıplarını bulur)
+            # Metni soru bloklarına ayır
+            soru_bloklari = re.split(r'(?i)(?:soru\s*\d+[\.\)]?|\d+[\.\)]\s+)', tam_metin)
+            for blok in soru_bloklari:
+                blok = blok.strip()
+                if len(blok) > 10:
+                    # Seçenekleri ve soru metnini ayıkla (A), B), C), D) veya A., B., C., D.)
+                    satirlar = [s.strip() for s in blok.split('\n') if s.strip()]
+                    if len(satirlar) >= 5:
+                        s_metni = satirlar[0]
+                        sec_a = satirlar[1].lstrip('A-a.) ]')
+                        sec_b = satirlar[2].lstrip('B-b.) ]')
+                        sec_c = satirlar[3].lstrip('C-c.) ]')
+                        sec_d = satirlar[4].lstrip('D-d.) ]')
+                        dogru = "A" # Varsayılan doğru cevap
+                        
+                        cursor.execute("""
+                            INSERT INTO sorular (test_adi, soru_metni, secenek_a, secenek_b, secenek_c, secenek_d, dogru_cevap) 
+                            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        """, (test_adi, s_metni, sec_a, sec_b, sec_c, sec_d, dogru))
+                        eklenen += 1
+        else:
+            # Manuel ekleme formu
+            soru_sayisi = int(request.form.get("soru_sayisi", 1))
             for i in range(1, soru_sayisi + 1):
                 metin = request.form.get(f"soru_metni_{i}", "").strip()
                 a = request.form.get(f"secenek_a_{i}", "").strip()
@@ -385,12 +429,12 @@ def coklu_soru_ekle():
                     """, (test_adi, metin, a, b, c, d, dogru))
                     eklenen += 1
 
-            conn.commit()
-            cursor.close()
-            conn.close()
-            flash(f"'{test_adi}' testine {eklenen} soru eklendi!", "success")
-        except Exception as e:
-            flash(f"Hata: {e}", "error")
+        conn.commit()
+        cursor.close()
+        conn.close()
+        flash(f"'{test_adi}' testine toplam {eklenen} soru başarıyla eklendi!", "success")
+    except Exception as e:
+        flash(f"Soru ekleme hatası: {e}", "error")
 
     return redirect(url_for("admin_panel", tab="tab-sinavlar"))
 
@@ -410,6 +454,23 @@ def test_yayinla(test_adi):
         conn.close()
     except:
         pass
+    return redirect(url_for("admin_panel", tab="tab-sinavlar"))
+
+@app.route("/admin/test-sil/<test_adi>")
+def test_sil(test_adi):
+    if not session.get("admin_logged_in"): return redirect(url_for("admin_panel"))
+    try:
+        conn = db_baglantisi()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM sorular WHERE test_adi = %s", (test_adi,))
+        cursor.execute("DELETE FROM ogrenci_online_sonuclar WHERE test_adi = %s", (test_adi,))
+        cursor.execute("DELETE FROM test_ayarlari WHERE test_adi = %s", (test_adi,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        flash(f"'{test_adi}' sınavı ve ilgili tüm sorular/sonuçlar silindi.", "info")
+    except Exception as e:
+        flash(f"Sınav silme hatası: {e}", "error")
     return redirect(url_for("admin_panel", tab="tab-sinavlar"))
 
 @app.route("/admin/soru-sil/<int:soru_id>")
@@ -489,39 +550,46 @@ def ogrenci_sil(ogrenci_no):
 def excel_yukle():
     if not session.get("admin_logged_in"): return redirect(url_for("admin_panel"))
     dosya = request.files.get("excel_dosya")
-    if dosya:
+    if dosya and dosya.filename:
         try:
             df = pd.read_excel(dosya)
-            # Sütun isimlerini küçük harfe çevir ve temizle
-            df.columns = [str(col).strip().lower() for col in df.columns]
-            
+            col_map = {}
+            for col in df.columns:
+                c_str = str(col).strip().lower()
+                if "no" in c_str: col_map["ogrenci_no"] = col
+                elif "ad" in c_str or "isim" in c_str: col_map["ad"] = col
+                elif "sinav" in c_str or "ders" in c_str: col_map["sinav"] = col
+                elif "dogru" in c_str or "doğru" in c_str: col_map["dogru"] = col
+                elif "yanlis" in c_str or "yanlış" in c_str: col_map["yanlis"] = col
+                elif "bos" in c_str or "boş" in c_str: col_map["bos"] = col
+                elif "puan" in c_str or "not" in c_str: col_map["puan"] = col
+                elif "derece" in c_str or "sira" in c_str or "sıra" in c_str: col_map["derece"] = col
+
             conn = db_baglantisi()
             cursor = conn.cursor()
-            sayac = 0
+            eklenen = 0
+
             for _, row in df.iterrows():
-                # Farklı sütun isimlerini yakala
-                no = str(row.get("ogrenci_no", row.get("no", row.get("okul_no", row.get("ogrenci no", ""))))).strip()
-                if not no or no == "nan" or no == "0":
+                no_col = col_map.get("ogrenci_no")
+                ad_col = col_map.get("ad")
+                sinav_col = col_map.get("sinav")
+
+                no = str(row[no_col]).strip() if no_col and pd.notna(row[no_col]) else ""
+                ad = str(row[ad_col]).strip() if ad_col and pd.notna(row[ad_col]) else "İsimsiz"
+                sinav_adi = str(row[sinav_col]).strip() if sinav_col and pd.notna(row[sinav_col]) else "Genel"
+
+                if not no or no.lower() in ["nan", "none", "0", ""]:
                     continue
-                
-                ad = str(row.get("ad", row.get("ad_soyad", row.get("isim", row.get("ad soyad", "İsimsiz"))))).strip()
-                sinav_adi = str(row.get("sinav", row.get("sinav_adi", row.get("ders", row.get("sinav adi", "Genel Sınav"))))).strip()
-                
+
                 try:
-                    dogru = int(row.get("dogru", 0))
-                except: dogru = 0
-                try:
-                    yanlis = int(row.get("yanlis", 0))
-                except: yanlis = 0
-                try:
-                    bos = int(row.get("bos", 0))
-                except: bos = 0
-                try:
-                    puan = int(row.get("puan", 0))
-                except: puan = 0
-                
-                derece = str(row.get("derece", "")).strip()
-                if derece == "nan": derece = ""
+                    dogru = int(row[col_map["dogru"]]) if "dogru" in col_map and pd.notna(row[col_map["dogru"]]) else 0
+                    yanlis = int(row[col_map["yanlis"]]) if "yanlis" in col_map and pd.notna(row[col_map["yanlis"]]) else 0
+                    bos = int(row[col_map["bos"]]) if "bos" in col_map and pd.notna(row[col_map["bos"]]) else 0
+                    puan = int(row[col_map["puan"]]) if "puan" in col_map and pd.notna(row[col_map["puan"]]) else 0
+                    derece = str(row[col_map["derece"]]).strip() if "derece" in col_map and pd.notna(row[col_map["derece"]]) else ""
+                    if derece.lower() == "nan": derece = ""
+                except:
+                    dogru, yanlis, bos, puan, derece = 0, 0, 0, 0, ""
 
                 cursor.execute("INSERT INTO ogrenciler (ogrenci_no, ad) VALUES (%s, %s) ON CONFLICT (ogrenci_no) DO UPDATE SET ad = EXCLUDED.ad", (no, ad))
                 cursor.execute("""
@@ -529,12 +597,12 @@ def excel_yukle():
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (ogrenci_no, sinav) DO UPDATE SET dogru = EXCLUDED.dogru, yanlis = EXCLUDED.yanlis, bos = EXCLUDED.bos, puan = EXCLUDED.puan, derece = EXCLUDED.derece
                 """, (no, sinav_adi, dogru, yanlis, bos, puan, derece))
-                sayac += 1
+                eklenen += 1
 
             conn.commit()
             cursor.close()
             conn.close()
-            flash(f"Excel başarıyla aktarıldı! ({sayac} kayıt işlendi)", "success")
+            flash(f"Excel başarıyla işlendi! {eklenen} kayıt eklendi/güncellendi.", "success")
         except Exception as e:
             flash(f"Excel yükleme hatası: {e}", "error")
     return redirect(url_for("admin_panel", tab="tab-excel"))
@@ -543,40 +611,39 @@ def excel_yukle():
 def excel_indir():
     if not session.get("admin_logged_in"): return redirect(url_for("admin_panel"))
     try:
-        conn = db_baglantisi()
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT o.ogrenci_no, o.ad, s.sinav, s.dogru, s.yanlis, s.bos, s.puan, s.derece 
-            FROM ogrenciler o 
-            LEFT JOIN sinavlar s ON o.ogrenci_no = s.ogrenci_no 
-            ORDER BY CAST(o.ogrenci_no AS INTEGER) ASC, s.id DESC
-        """)
-        satirlar = cursor.fetchall()
-        cursor.close()
-        conn.close()
+        veriler = sinav_verilerini_getir()
+        satirlar = []
+        for no, bilgi in veriler.items():
+            if bilgi["sinavlar"]:
+                for s in bilgi["sinavlar"]:
+                    satirlar.append({
+                        "Öğrenci No": no,
+                        "Ad Soyad": bilgi["ad"],
+                        "Sınav / Ders": s["sinav"],
+                        "Doğru": s["dogru"],
+                        "Yanlış": s["yanlis"],
+                        "Boş": s["bos"],
+                        "Puan": s["puan"],
+                        "Derece": s.get("derece", "")
+                    })
+            else:
+                satirlar.append({
+                    "Öğrenci No": no,
+                    "Ad Soyad": bilgi["ad"],
+                    "Sınav / Ders": "-",
+                    "Doğru": 0, "Yanlış": 0, "Boş": 0, "Puan": 0, "Derece": ""
+                })
 
-        export_data = []
-        for r in satirlar:
-            export_data.append({
-                "Öğrenci No": r["ogrenci_no"],
-                "Ad Soyad": r["ad"],
-                "Sınav / Ders Adı": r["sinav"] if r["sinav"] else "-",
-                "Doğru": r["dogru"] if r["dogru"] is not None else 0,
-                "Yanlış": r["yanlis"] if r["yanlis"] is not None else 0,
-                "Boş": r["bos"] if r["bos"] is not None else 0,
-                "Puan": r["puan"] if r["puan"] is not None else 0,
-                "Derece": r["derece"] if r["derece"] else ""
-            })
-
-        df = pd.DataFrame(export_data)
+        df = pd.DataFrame(satirlar)
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
-            df.to_excel(writer, index=False, sheet_name="Sınav Sonuçları")
+            df.to_excel(writer, index=False, sheet_name="Sinav_Sonuclari")
         output.seek(0)
+        
         return send_file(
-            output, 
-            as_attachment=True, 
-            download_name="Ogretmen_Sinav_Sonuclari_Tüm_Liste.xlsx", 
+            output,
+            as_attachment=True,
+            download_name="Ogretmen_Sinav_Sonuclari.xlsx",
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
     except Exception as e:

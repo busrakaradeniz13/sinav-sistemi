@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Öğrenci Sınav Sonuç Sorgulama - Büşra Güngör</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- KUTLAMA / KONFETİ EFEKTİ İÇİN KÜTÜPHANE -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 </head>
 <body class="bg-slate-900 min-h-screen text-slate-100 font-sans flex flex-col justify-between p-4 selection:bg-indigo-500 selection:text-white">
 
@@ -68,7 +70,7 @@
                     <span class="text-xs text-slate-400 font-medium">Derece Durumu</span>
                     {% if en_son_derece %}
                         <div class="mt-1">
-                            <span class="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-extrabold px-3 py-1 rounded-full shadow-sm inline-block">
+                            <span class="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-extrabold px-3 py-1 rounded-full shadow-sm inline-block animate-bounce">
                                 🏆 Sınıf {{ en_son_derece }}.si
                             </span>
                         </div>
@@ -114,7 +116,7 @@
                                 <span class="font-bold text-sm text-indigo-300">{{ s.sinav }}</span>
                                 <span class="bg-indigo-600 text-white text-xs font-extrabold px-3 py-1 rounded-xl shadow-sm">
                                     {{ s.puan }} Puan
-                                </span>
+                                 </span>
                             </div>
 
                             <div class="grid grid-cols-4 gap-2 text-center text-xs">
@@ -148,6 +150,33 @@
             </div>
 
         </div>
+
+        <!-- EĞER ÖĞRENCİ DERECE YAPTIYSA (1, 2 veya 3) OTOMATİK KUTLAMA KONFETİSİ PATLAT -->
+        {% if en_son_derece %}
+        <script>
+            window.addEventListener('DOMContentLoaded', () => {
+                // Şahane bir kutlama konfeti efekti
+                var duration = 3 * 1000;
+                var animationEnd = Date.now() + duration;
+                var defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
+
+                function randomInRange(min, max) {
+                    return Math.random() * (max - min) + min;
+                }
+
+                var interval = setInterval(function() {
+                    var timeLeft = animationEnd - Date.now();
+                    if (timeLeft <= 0) {
+                        return clearInterval(interval);
+                    }
+                    var particleCount = 50 * (timeLeft / duration);
+                    confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } }));
+                    confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
+                }, 250);
+            });
+        </script>
+        {% endif %}
+
         {% endif %}
 
     </main>

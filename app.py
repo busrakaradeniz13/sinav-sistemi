@@ -17,7 +17,7 @@ from flask import (
 import pandas as pd
 
 app = Flask(__name__)
-app.secret_key = "uzman_ogretmen_guvenli_sistem_key_2026_v5"
+app.secret_key = "uzman_ogretmen_guvenli_sistem_key_2026_v6"
 
 ADMIN_PASSWORD = "15698"
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -140,7 +140,8 @@ def sinav_verilerini_getir():
             no = ogrenci["ogrenci_no"]
             ad = ogrenci["ad"]
             
-            cursor.execute("SELECT * FROM sinavlar WHERE ogrenci_no = %s ORDER BY id ASC", (no,))
+            # En son eklenen sınav en üstte gözüksün diye id'ye göre azalan (DESC) sıralıyoruz
+            cursor.execute("SELECT * FROM sinavlar WHERE ogrenci_no = %s ORDER BY id DESC", (no,))
             sinavlar = [dict(s) for s in cursor.fetchall()]
 
             veriler[no] = {
@@ -155,6 +156,23 @@ def sinav_verilerini_getir():
     except Exception as e:
         print(f"Veri çekme hatası: {e}")
         return {}
+
+def tum_sinav_adlarini_getir():
+    adlar = []
+    try:
+        conn = db_baglantisi()
+        cursor = conn.cursor()
+        cursor.execute("SELECT DISTINCT sinav FROM sinavlar UNION SELECT test_adi FROM test_ayarlari")
+        rows = cursor.fetchall()
+        for r in rows:
+            val = r.get("sinav") or r.get("test_adi")
+            if val and val not in adlar:
+                adlar.append(val)
+        cursor.close()
+        conn.close()
+    except:
+        pass
+    return adlar
 
 @app.route("/", methods=["GET", "POST"])
 def veli_sorgula():
@@ -205,10 +223,10 @@ def veli_sorgula():
                 print(f"Sorgu sayaç güncelleme hatası: {e}")
 
             ham = sinav_verileri[ogrenci_no]
-            ters_sinavlar = list(reversed(ham["sinavlar"]))
-            sonuc = {"ogrenci_no": ogrenci_no, "ad": ham["ad"], "sinavlar": ters_sinavlar}
-            if ters_sinavlar:
-                d = str(ters_sinavlar[0].get("derece", "")).replace(".", "").strip().lower()
+            # Zaten id DESC sıralı geldiği için doğrudan ham["sinavlar"] en son sınavı en üste getirir
+            sonuc = {"ogrenci_no": ogrenci_no, "ad": ham["ad"], "sinavlar": ham["sinavlar"]}
+            if ham["sinavlar"]:
+                d = str(ham["sinavlar"][0].get("derece", "")).replace(".", "").strip().lower()
                 if d in ["1", "2", "3"]:
                     en_son_derece = d
         else:
@@ -291,6 +309,7 @@ def admin_panel():
     toplam_ziyaret, toplam_sorgu = istatistik_getir()
     tum_sorular, test_listesi = [], []
     aktif_tab = request.args.get("tab", "tab-ogrenciler")
+    kayitli_dersler = tum_sinav_adlarini_getir()
 
     try:
         conn = db_baglantisi()
@@ -321,7 +340,8 @@ def admin_panel():
         test_listesi=test_listesi,
         toplam_ziyaret=toplam_ziyaret,
         toplam_sorgu=toplam_sorgu,
-        aktif_tab=aktif_tab
+        aktif_tab=aktif_tab,
+        kayitli_dersler=kayitli_dersler
     )
 
 @app.route("/admin/cikis")
@@ -445,7 +465,6 @@ def ogrenci_kaydet():
             flash("Kayıt eklendi/güncellendi.", "success")
         except Exception as e:
             flash(f"Hata: {e}", "error")
-    # Kayıttan sonra yine Öğrenci/Not Ekle sekmesinde kalır
     return redirect(url_for("admin_panel", tab="tab-ekle"))
 
 @app.route("/admin/ogrenci-sil/<ogrenci_no>")
@@ -514,7 +533,7 @@ def excel_indir():
         df = pd.DataFrame(satirlar)
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
-            df.to_excel(writer, index=False)
+            df.to_excel(output, index=False)
         output.seek(0)
         return send_file(output, as_attachment=True, download_name="Ogretmen_Sinav_Sonuclari.xlsx", mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     except:

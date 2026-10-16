@@ -3,206 +3,158 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Öğrenci Sınav Sonuçları Sorgulama</title>
+    <title>Öğrenci Sınav Sonuç Sorgulama - Büşra Güngör</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @keyframes popUp {
-            0% { transform: scale(0.6); opacity: 0; }
-            70% { transform: scale(1.05); opacity: 1; }
-            100% { transform: scale(1); opacity: 1; }
-        }
-        .animate-celebration {
-            animation: popUp 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-        }
-
-        #fxContainer {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            pointer-events: none;
-            z-index: 99999;
-            overflow: hidden;
-            display: none;
-        }
-        .confetti-piece {
-            position: absolute;
-            width: 10px;
-            height: 16px;
-            opacity: 0.9;
-            animation: fall linear forwards;
-        }
-        @keyframes fall {
-            0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
-            100% { transform: translateY(105vh) rotate(720deg); opacity: 0; }
-        }
-    </style>
 </head>
-<body class="bg-slate-50 min-h-screen flex flex-col justify-between font-sans relative overflow-x-hidden">
+<body class="bg-slate-900 min-h-screen text-slate-100 font-sans flex flex-col justify-between p-4 selection:bg-indigo-500 selection:text-white">
 
-    <!-- HAREKETLİ KONFETİ ALANI -->
-    <div id="fxContainer"></div>
-
-    <!-- ÜST BAŞLIK -->
-    <header class="bg-indigo-600 text-white py-6 px-4 shadow-md text-center relative">
-        <!-- SAĞ ÜST KÖŞEDEKİ ÖĞRETMEN GİRİŞİ BUTONU -->
-        <a href="/admin" class="absolute top-1/2 -translate-y-1/2 right-4 md:right-8 bg-indigo-700 hover:bg-indigo-800 text-white text-xs md:text-sm font-semibold px-3.5 py-2 rounded-xl transition duration-200 shadow-sm border border-indigo-500 flex items-center gap-1.5">
-            <span>👨‍🏫</span> <span>Öğretmen Girişi</span>
-        </a>
-
-        <h1 class="text-xl md:text-2xl font-bold tracking-tight">Büşra Güngör Öğrenci Sınav Sonuçları</h1>
-        <p class="text-xs text-indigo-200 mt-1">Öğrenci numaranızı girerek tüm sınav geçmişinizi inceleyebilirsiniz.</p>
+    <!-- ÜST KISIM / BAŞLIK -->
+    <header class="w-full max-w-xl mx-auto text-center pt-8 pb-4 space-y-2">
+        <div class="inline-block bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 px-4 py-1.5 rounded-full text-xs font-bold tracking-wider uppercase shadow-sm">
+            Büşra Güngör • Sınav ve Başarı Sistemi
+        </div>
+        <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+            Öğrenci Sınav Sonuç Sorgulama
+        </h1>
+        <p class="text-xs sm:text-sm text-slate-400">
+            Lütfen okul numaranızı girerek karne ve sınav geçmişinize ulaşın.
+        </p>
     </header>
 
-    <!-- ANA İÇERİK -->
-    <main class="max-w-2xl w-full mx-auto p-4 md:p-6 my-auto space-y-6">
-
+    <!-- ANA İÇERİK KUTUSU -->
+    <main class="w-full max-w-xl mx-auto space-y-6">
+        
         <!-- SORGULAMA FORMU -->
-        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-            <form method="POST" class="space-y-4">
+        <div class="bg-slate-800/90 backdrop-blur-md p-6 sm:p-8 rounded-3xl border border-slate-700/80 shadow-2xl">
+            <form method="POST" action="/" class="space-y-4">
                 <div>
-                    <label class="block text-xs font-bold text-slate-600 uppercase mb-2">Öğrenci Numarası</label>
-                    <div class="flex gap-2">
-                        <input type="text" name="ogrenci_no" placeholder="Örn: 101" required autofocus
-                            class="flex-1 px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-base text-slate-800">
-                        <button type="submit" 
-                            class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-3 rounded-xl transition duration-200 shadow-md text-sm">
-                            Sorgula 🔍
-                        </button>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+                        Okul / Öğrenci Numarası
+                    </label>
+                    <div class="relative">
+                        <input type="text" name="ogrenci_no" required placeholder="Örn: 101" autofocus autocomplete="off"
+                            class="w-full px-4 py-3.5 rounded-2xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-base shadow-inner">
+                        <div class="absolute right-3.5 top-3.5 text-slate-500 text-lg">
+                            🔍
+                        </div>
                     </div>
                 </div>
-            </form>
 
-            {% if hata %}
-            <div class="mt-4 p-4 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold rounded-xl text-center">
-                {{ hata }}
-            </div>
-            {% endif %}
+                <button type="submit" 
+                    class="w-full bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white font-bold py-3.5 rounded-2xl shadow-lg shadow-indigo-600/30 transition duration-200 text-sm tracking-wide">
+                    Sonuçları Sorgula 🚀
+                </button>
+            </form>
         </div>
 
-        <!-- SONUÇ EKRANI -->
-        {% if sonuc %}
-
-        <!-- SADECE EN SON GİRİLEN (EN ÜSTTEKİ) SINAVDA 1, 2 VEYA 3 VARSA KUTLAMA GÖSTERİLİR -->
-        {% if en_son_derece %}
-        <div class="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 p-6 md:p-8 rounded-3xl shadow-2xl text-slate-900 text-center space-y-4 border-4 border-white animate-celebration">
-            <div class="inline-flex items-center justify-center w-24 h-24 bg-white rounded-full shadow-xl text-5xl font-black text-amber-600 border-4 border-amber-200">
-                {{ en_son_derece }}.
-            </div>
-            <div class="space-y-1">
-                <span class="bg-slate-900 text-amber-300 text-xs font-black uppercase px-4 py-1.5 rounded-full tracking-widest shadow">
-                    🏆 EN SON SINAVDA SINIF DERECESİ
-                </span>
-                <h2 class="text-3xl font-black tracking-tight text-slate-900 mt-1">TEBRİKLER!</h2>
-                <p class="text-sm font-bold text-slate-900 max-w-md mx-auto leading-relaxed pt-1">
-                    🎉 "Tebrikler! Sınıf içinde gösterdiğin bu üstün başarıdan dolayı seni kutluyorum."
-                </p>
-            </div>
+        <!-- HATA MESAJI -->
+        {% if hata %}
+        <div class="bg-rose-950/60 border border-rose-500/50 p-4 rounded-2xl text-rose-300 text-xs font-bold text-center shadow-lg animate-pulse">
+            ⚠️ {{ hata }}
         </div>
         {% endif %}
 
-        <div class="bg-white p-6 md:p-8 rounded-2xl shadow-md border border-slate-200 space-y-6">
+        <!-- SONUÇ EKRANI -->
+        {% if sonuc %}
+        <div class="bg-slate-800/90 backdrop-blur-md p-6 sm:p-8 rounded-3xl border border-slate-700/80 shadow-2xl space-y-6">
             
-            <!-- ÖĞRENCİ BİLGİSİ -->
-            <div class="flex justify-between items-center border-b pb-4">
+            <!-- ÖĞRENCİ BİLGİ KARTI -->
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-700 pb-4 gap-2">
                 <div>
-                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Öğrenci Adı Soyadı</span>
-                    <h2 class="text-xl font-extrabold text-slate-800 mt-0.5">{{ sonuc.ad }}</h2>
+                    <span class="text-[10px] uppercase font-extrabold tracking-wider text-indigo-400 bg-indigo-500/10 px-2.5 py-1 rounded-md border border-indigo-500/20">Öğrenci Bilgisi</span>
+                    <h2 class="text-xl font-black text-white mt-2">{{ sonuc.ad }}</h2>
                 </div>
                 <div class="text-right">
-                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Okul Numarası</span>
-                    <div class="text-sm font-bold bg-indigo-50 text-indigo-700 px-3 py-1 rounded-xl mt-0.5 inline-block border border-indigo-100">
-                        No: {{ request.form.get('ogrenci_no') }}
-                    </div>
+                    <span class="text-xs text-slate-400 font-medium">Derece Durumu</span>
+                    {% if en_son_derece %}
+                        <div class="mt-1">
+                            <span class="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-extrabold px-3 py-1 rounded-full shadow-sm inline-block">
+                                🏆 Sınıf {{ en_son_derece }}.si
+                            </span>
+                        </div>
+                    {% else %}
+                        <div class="text-xs font-bold text-slate-500 mt-1">-</div>
+                    {% endif %}
                 </div>
             </div>
 
-            <!-- SINAV LİSTESİ (EN GÜNCEL EN ÜSTTE) -->
-            <div class="space-y-4">
-                <div class="flex justify-between items-center">
-                    <h3 class="text-sm font-bold text-slate-700">Sınav Sonuçları ve Karne Geçmişi</h3>
-                    <span class="text-[11px] text-indigo-600 font-semibold bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100">En güncel sınav en üsttedir</span>
+            <!-- AKTİF ONLINE SINAVLAR (EĞER VARSA) -->
+            {% if aktif_testler %}
+            <div class="bg-indigo-950/50 border border-indigo-500/40 p-4 rounded-2xl space-y-3">
+                <div class="flex items-center gap-2">
+                    <span class="text-sm">📝</span>
+                    <h3 class="text-xs font-bold text-indigo-300 uppercase tracking-wider">Çözülebilir Aktif Online Sınavlar</h3>
                 </div>
-                
-                <div class="space-y-3">
-                    {% for sinav in sonuc.sinavlar %}
-                    <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
-                        
-                        <div class="flex justify-between items-center">
-                            <span class="font-bold text-slate-800 text-sm">{{ sinav.sinav }}</span>
-                            {% if loop.first and en_son_derece %}
-                            <!-- Sadece en üstteki (en son) sınavda derece rozeti vurgulanır -->
-                            <span class="bg-amber-100 text-amber-800 text-xs font-extrabold px-3 py-1 rounded-xl border border-amber-200 shadow-xs">
-                                🏆 Sınıf Derecesi: {{ sinav.derece }}
-                            </span>
-                            {% elif sinav.derece %}
-                            <span class="bg-slate-200 text-slate-700 text-xs font-bold px-3 py-1 rounded-xl border border-slate-300">
-                                Sınıf Derecesi: {{ sinav.derece }}
-                            </span>
-                            {% endif %}
+                <div class="space-y-2">
+                    {% for test in aktif_testler %}
+                    <div class="flex justify-between items-center bg-slate-900/80 p-3 rounded-xl border border-indigo-900/50 gap-2">
+                        <div>
+                            <div class="text-xs font-bold text-white">{{ test.test_adi }}</div>
+                            <div class="text-[10px] text-slate-400">Süre: {{ test.sure_dakika }} Dakika</div>
                         </div>
-
-                        <!-- NOTLAR -->
-                        <div class="grid grid-cols-4 gap-2 text-center pt-2 border-t border-slate-200/60">
-                            <div class="bg-white p-2 rounded-lg border">
-                                <span class="block text-[10px] text-slate-400 font-semibold uppercase">Doğru</span>
-                                <span class="text-sm font-bold text-emerald-600">{{ sinav.dogru }}</span>
-                            </div>
-                            <div class="bg-white p-2 rounded-lg border">
-                                <span class="block text-[10px] text-slate-400 font-semibold uppercase">Yanlış</span>
-                                <span class="text-sm font-bold text-rose-600">{{ sinav.yanlis }}</span>
-                            </div>
-                            <div class="bg-white p-2 rounded-lg border">
-                                <span class="block text-[10px] text-slate-400 font-semibold uppercase">Boş</span>
-                                <span class="text-sm font-bold text-slate-500">{{ sinav.bos }}</span>
-                            </div>
-                            <div class="bg-indigo-50 p-2 rounded-lg border border-indigo-100">
-                                <span class="block text-[10px] text-indigo-400 font-semibold uppercase">Puan</span>
-                                <span class="text-base font-extrabold text-indigo-700">{{ sinav.puan }}</span>
-                            </div>
-                        </div>
-
+                        <a href="/online-sinav/{{ test.test_adi }}/{{ sonuc.ogrenci_no }}" 
+                           class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 rounded-xl text-xs transition shadow shrink-0">
+                           Sınava Katıl 🚀
+                        </a>
                     </div>
                     {% endfor %}
                 </div>
             </div>
+            {% endif %}
+
+            <!-- SINAV GEÇMİŞİ LİSTESİ -->
+            <div class="space-y-3">
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Sınav Sonuçları ve Karne Geçmişi</h3>
+                
+                {% if sonuc.sinavlar %}
+                    <div class="space-y-3 max-h-96 overflow-y-auto pr-1">
+                        {% for s in sonuc.sinavlar %}
+                        <div class="bg-slate-900/60 border border-slate-700/60 p-4 rounded-2xl space-y-3 hover:border-slate-600 transition">
+                            <div class="flex justify-between items-center">
+                                <span class="font-bold text-sm text-indigo-300">{{ s.sinav }}</span>
+                                <span class="bg-indigo-600 text-white text-xs font-extrabold px-3 py-1 rounded-xl shadow-sm">
+                                    {{ s.puan }} Puan
+                                </span>
+                            </div>
+
+                            <div class="grid grid-cols-4 gap-2 text-center text-xs">
+                                <div class="bg-slate-800/80 p-2 rounded-xl border border-slate-700">
+                                    <span class="block text-[10px] text-slate-400 font-bold uppercase">Doğru</span>
+                                    <span class="font-black text-emerald-400 text-sm">{{ s.dogru }}</span>
+                                </div>
+                                <div class="bg-slate-800/80 p-2 rounded-xl border border-slate-700">
+                                    <span class="block text-[10px] text-slate-400 font-bold uppercase">Yanlış</span>
+                                    <span class="font-black text-rose-400 text-sm">{{ s.yanlis }}</span>
+                                </div>
+                                <div class="bg-slate-800/80 p-2 rounded-xl border border-slate-700">
+                                    <span class="block text-[10px] text-slate-400 font-bold uppercase">Boş</span>
+                                    <span class="font-black text-slate-300 text-sm">{{ s.bos }}</span>
+                                </div>
+                                <div class="bg-slate-800/80 p-2 rounded-xl border border-slate-700">
+                                    <span class="block text-[10px] text-slate-400 font-bold uppercase">Sıra</span>
+                                    <span class="font-black text-amber-400 text-sm">
+                                        {% if s.derece %}{{ s.derece }}{% else %}-{% endif %}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-6 text-slate-500 text-xs font-medium">
+                        Bu öğrenciye ait kayıtlı sınav sonucu bulunamadı.
+                    </div>
+                {% endif %}
+            </div>
 
         </div>
-
-        <!-- 2 SANİYELİK HAREKETLİ KONFETİ TETİKLEYİCİSİ -->
-        {% if en_son_derece %}
-        <script>
-            window.addEventListener('DOMContentLoaded', () => {
-                const container = document.getElementById('fxContainer');
-                if(!container) return;
-                
-                container.style.display = 'block';
-                const colors = ['#f59e0b', '#ef4444', '#10b981', '#3b82f6', '#ec4899', '#8b5cf6', '#eab308'];
-                
-                for (let i = 0; i < 90; i++) {
-                    const piece = document.createElement('div');
-                    piece.className = 'confetti-piece';
-                    piece.style.left = Math.random() * 100 + 'vw';
-                    piece.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
-                    piece.style.animationDuration = (Math.random() * 1.0 + 1.0) + 's';
-                    piece.style.animationDelay = (Math.random() * 0.5) + 's';
-                    piece.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
-                    container.appendChild(piece);
-                }
-
-                setTimeout(() => {
-                    container.remove();
-                }, 2200);
-            });
-        </script>
-        {% endif %}
         {% endif %}
 
     </main>
 
-    <footer class="text-center py-4 text-xs text-slate-400 border-t border-slate-200 mt-8">
-        © 2026 Büşra Güngör Öğrenci Sınav ve Karne Sistemi • Tüm hakları saklıdır.
+    <!-- ALT BİLGİ -->
+    <footer class="w-full max-w-xl mx-auto text-center py-6 text-xs text-slate-500">
+        <p>© 2026 Büşra Güngör • Tüm Hakları Saklıdır.</p>
     </footer>
 
 </body>

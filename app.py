@@ -20,7 +20,7 @@ import pypdf
 import docx
 
 app = Flask(__name__)
-app.secret_key = "uzman_ogretmen_guvenli_sistem_key_2026_v8"
+app.secret_key = "uzman_ogretmen_guvenli_sistem_key_2026_v9"
 
 ADMIN_PASSWORD = "15698"
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -375,7 +375,6 @@ def coklu_soru_ekle():
 
         eklenen = 0
 
-        # DOSYADAN SORU OKUMA (PDF veya DOCX)
         if soru_dosyasi and soru_dosyasi.filename:
             dosya_adi = soru_dosyasi.filename.lower()
             tam_metin = ""
@@ -390,13 +389,10 @@ def coklu_soru_ekle():
                 for p in doc.paragraphs:
                     if p.text: tam_metin += p.text + "\n"
 
-            # Basit akıllı soru ayrıştırıcı (1. Soru / Soru 1 kalıplarını bulur)
-            # Metni soru bloklarına ayır
             soru_bloklari = re.split(r'(?i)(?:soru\s*\d+[\.\)]?|\d+[\.\)]\s+)', tam_metin)
             for blok in soru_bloklari:
                 blok = blok.strip()
                 if len(blok) > 10:
-                    # Seçenekleri ve soru metnini ayıkla (A), B), C), D) veya A., B., C., D.)
                     satirlar = [s.strip() for s in blok.split('\n') if s.strip()]
                     if len(satirlar) >= 5:
                         s_metni = satirlar[0]
@@ -404,7 +400,7 @@ def coklu_soru_ekle():
                         sec_b = satirlar[2].lstrip('B-b.) ]')
                         sec_c = satirlar[3].lstrip('C-c.) ]')
                         sec_d = satirlar[4].lstrip('D-d.) ]')
-                        dogru = "A" # Varsayılan doğru cevap
+                        dogru = "A"
                         
                         cursor.execute("""
                             INSERT INTO sorular (test_adi, soru_metni, secenek_a, secenek_b, secenek_c, secenek_d, dogru_cevap) 
@@ -412,7 +408,6 @@ def coklu_soru_ekle():
                         """, (test_adi, s_metni, sec_a, sec_b, sec_c, sec_d, dogru))
                         eklenen += 1
         else:
-            # Manuel ekleme formu
             soru_sayisi = int(request.form.get("soru_sayisi", 1))
             for i in range(1, soru_sayisi + 1):
                 metin = request.form.get(f"soru_metni_{i}", "").strip()

@@ -55,21 +55,46 @@
         {% endif %}
 
         {% if sonuc %}
-        <!-- BÜYÜK SARI TEBRİK MESAJI KUTUSU -->
+        
+        <!-- SADECE SON SINAVDA İLK 3'E GİREN ÖĞRENCİYE ÖZEL TEBRİK KUTUSU -->
+        {% if en_son_derece %}
         <div class="bg-gradient-to-r from-amber-200 via-yellow-100 to-amber-200 border-4 border-amber-400 p-6 sm:p-8 rounded-3xl shadow-2xl text-center space-y-3">
-            <span class="text-3xl block">🎉 Tebrikler! 🏆</span>
-            <h2 class="text-lg sm:text-xl font-black text-amber-950">Sevgili {{ sonuc.ad }}</h2>
+            <span class="text-4xl block">🎉 Tebrikler! 🏆</span>
+            <h2 class="text-xl sm:text-2xl font-black text-amber-950">Sevgili {{ sonuc.ad }}</h2>
             <p class="text-sm sm:text-base font-bold text-amber-900 leading-relaxed">
-                Gösterdiğin gayret, azim ve elde ettiğin başarılar için seni gönülden kutlar, başarılarının devamını dileriz!
+                Son sınavda elde ettiğin muhteşem derece için seni yürekten kutlar, başarılarının devamını dileriz!
             </p>
-            {% if en_son_derece %}
             <div class="pt-2">
-                <span class="bg-amber-600 text-white text-sm font-black px-6 py-2 rounded-full shadow-lg inline-block animate-bounce tracking-wide">
+                <span class="bg-amber-600 text-white text-base font-black px-8 py-2.5 rounded-full shadow-lg inline-block animate-bounce tracking-wide">
                     🏆 Sınıf {{ en_son_derece }}.si Oldunuz!
                 </span>
             </div>
-            {% endif %}
         </div>
+
+        <!-- HAVAİ FİŞEK / KONFETİ EFEKTİ SCRIPT -->
+        <script>
+            function patlatKonfeti() {
+                if (typeof confetti === 'function') {
+                    var count = 200;
+                    var defaults = { origin: { y: 0.7 } };
+
+                    function fire(particleRatio, opts) {
+                        confetti(Object.assign({}, defaults, opts, {
+                            particleCount: Math.floor(count * particleRatio)
+                        }));
+                    }
+
+                    fire(0.25, { spread: 26, startVelocity: 55 });
+                    fire(0.2, { spread: 60 });
+                    fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
+                    fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
+                    fire(0.1, { spread: 120, startVelocity: 45 });
+                }
+            }
+            window.addEventListener('load', patlatKonfeti);
+            setTimeout(patlatKonfeti, 300);
+        </script>
+        {% endif %}
 
         <div class="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xl space-y-6">
             <div class="flex justify-between items-center border-b border-slate-100 pb-4">
@@ -83,7 +108,6 @@
                 </div>
             </div>
 
-            <!-- ONLINE SINAV VARSA KATIL BUTONU -->
             {% if aktif_testler %}
             <div class="bg-indigo-50 border border-indigo-200 p-4 rounded-2xl space-y-3">
                 <div class="flex items-center gap-2">
@@ -147,24 +171,6 @@
                 {% endif %}
             </div>
         </div>
-
-        {% if en_son_derece %}
-        <script>
-            window.addEventListener('DOMContentLoaded', () => {
-                var duration = 3 * 1000;
-                var animationEnd = Date.now() + duration;
-                var defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
-                function randomInRange(min, max) { return Math.random() * (max - min) + min; }
-                var interval = setInterval(function() {
-                    var timeLeft = animationEnd - Date.now();
-                    if (timeLeft <= 0) return clearInterval(interval);
-                    var particleCount = 50 * (timeLeft / duration);
-                    confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } }));
-                    confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
-                }, 250);
-            });
-        </script>
-        {% endif %}
         {% endif %}
     </main>
 

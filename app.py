@@ -17,7 +17,7 @@ from flask import (
 import pandas as pd
 
 app = Flask(__name__)
-app.secret_key = "uzman_ogretmen_guvenli_sistem_key_2026_v4"
+app.secret_key = "uzman_ogretmen_guvenli_sistem_key_2026_v5"
 
 ADMIN_PASSWORD = "15698"
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -290,6 +290,7 @@ def admin_panel():
     sinav_verileri = sinav_verilerini_getir()
     toplam_ziyaret, toplam_sorgu = istatistik_getir()
     tum_sorular, test_listesi = [], []
+    aktif_tab = request.args.get("tab", "tab-ogrenciler")
 
     try:
         conn = db_baglantisi()
@@ -319,7 +320,8 @@ def admin_panel():
         tum_sorular=tum_sorular, 
         test_listesi=test_listesi,
         toplam_ziyaret=toplam_ziyaret,
-        toplam_sorgu=toplam_sorgu
+        toplam_sorgu=toplam_sorgu,
+        aktif_tab=aktif_tab
     )
 
 @app.route("/admin/cikis")
@@ -364,11 +366,11 @@ def coklu_soru_ekle():
             conn.commit()
             cursor.close()
             conn.close()
-            flash(f"'{test_adi}' testine {eklenen} soru başarıyla eklendi!", "success")
+            flash(f"'{test_adi}' testine {eklenen} soru eklendi!", "success")
         except Exception as e:
             flash(f"Hata: {e}", "error")
 
-    return redirect(url_for("admin_panel"))
+    return redirect(url_for("admin_panel", tab="tab-sinavlar"))
 
 @app.route("/admin/test-yayinla/<test_adi>")
 def test_yayinla(test_adi):
@@ -386,7 +388,7 @@ def test_yayinla(test_adi):
         conn.close()
     except:
         pass
-    return redirect(url_for("admin_panel"))
+    return redirect(url_for("admin_panel", tab="tab-sinavlar"))
 
 @app.route("/admin/soru-sil/<int:soru_id>")
 def soru_sil(soru_id):
@@ -401,7 +403,7 @@ def soru_sil(soru_id):
         flash("Soru silindi.", "info")
     except:
         pass
-    return redirect(url_for("admin_panel"))
+    return redirect(url_for("admin_panel", tab="tab-sinavlar"))
 
 @app.route("/admin/ogrenci-ara/<ogrenci_no>")
 def ogrenci_ara(ogrenci_no):
@@ -440,10 +442,11 @@ def ogrenci_kaydet():
             conn.commit()
             cursor.close()
             conn.close()
-            flash("Kayıt güncellendi.", "success")
+            flash("Kayıt eklendi/güncellendi.", "success")
         except Exception as e:
             flash(f"Hata: {e}", "error")
-    return redirect(url_for("admin_panel"))
+    # Kayıttan sonra yine Öğrenci/Not Ekle sekmesinde kalır
+    return redirect(url_for("admin_panel", tab="tab-ekle"))
 
 @app.route("/admin/ogrenci-sil/<ogrenci_no>")
 def ogrenci_sil(ogrenci_no):
@@ -459,7 +462,7 @@ def ogrenci_sil(ogrenci_no):
         flash("Öğrenci silindi.", "info")
     except:
         pass
-    return redirect(url_for("admin_panel"))
+    return redirect(url_for("admin_panel", tab="tab-ogrenciler"))
 
 @app.route("/admin/excel-yukle", methods=["POST"])
 def excel_yukle():
@@ -497,7 +500,7 @@ def excel_yukle():
             flash("Excel aktarıldı!", "success")
         except Exception as e:
             flash(f"Excel hatası: {e}", "error")
-    return redirect(url_for("admin_panel"))
+    return redirect(url_for("admin_panel", tab="tab-excel"))
 
 @app.route("/admin/excel-indir")
 def excel_indir():

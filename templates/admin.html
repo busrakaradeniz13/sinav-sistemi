@@ -6,8 +6,9 @@
     <title>Öğretmen Yönetim Paneli</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-        function ogrenciGetir() {
-            let no = document.getElementById('ogrenci_no_input').value.strip ? document.getElementById('ogrenci_no_input').value.trim() : document.getElementById('ogrenci_no_input').value;
+        // Numara yazılınca adı otomatik getir
+        function ogrenciGetirNo() {
+            let no = document.getElementById('ogrenci_no_input').value.trim();
             if(!no) return;
             fetch('/admin/ogrenci-ara/' + no)
                 .then(res => res.json())
@@ -18,15 +19,32 @@
                 });
         }
 
+        // Açılır listeden isim seçilince numarayı otomatik getir
+        function ogrenciSecAd(selectElement) {
+            let selectedOption = selectElement.options[selectElement.selectedIndex];
+            let no = selectedOption.getAttribute('data-no');
+            let ad = selectedOption.value;
+            
+            if(no) {
+                document.getElementById('ogrenci_no_input').value = no;
+                document.getElementById('ad_input').value = ad;
+            }
+        }
+
         function tabAc(tabId) {
             document.querySelectorAll('.tab-icerik').forEach(el => el.classList.add('hidden'));
             document.querySelectorAll('.tab-btn').forEach(el => {
                 el.classList.remove('bg-indigo-600', 'text-white');
                 el.classList.add('bg-white', 'text-slate-700', 'border-slate-300');
             });
-            document.getElementById(tabId).classList.remove('hidden');
-            event.currentTarget.classList.remove('bg-white', 'text-slate-700', 'border-slate-300');
-            event.currentTarget.classList.add('bg-indigo-600', 'text-white');
+            let secilen = document.getElementById(tabId);
+            if(secilen) secilen.classList.remove('hidden');
+            
+            let btn = document.getElementById('btn-' + tabId);
+            if(btn) {
+                btn.classList.remove('bg-white', 'text-slate-700', 'border-slate-300');
+                btn.classList.add('bg-indigo-600', 'text-white');
+            }
         }
 
         function ogrenciDetayToggle(no) {
@@ -62,12 +80,16 @@
                 `;
             }
         }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            let varsayilanTab = "{{ aktif_tab if aktif_tab else 'tab-ogrenciler' }}";
+            tabAc(varsayilanTab);
+        });
     </script>
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800 font-sans p-4 selection:bg-indigo-600 selection:text-white">
     <div class="max-w-6xl mx-auto space-y-6">
 
-        <!-- ÜST BAR -->
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-6 rounded-3xl border border-slate-200 shadow-xl gap-4">
             <div>
                 <span class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Yönetim Paneli</span>
@@ -97,7 +119,6 @@
         </div>
         {% else %}
 
-        <!-- CANLI İSTATİSTİK SAYAÇLARI -->
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div class="bg-white border border-slate-200 p-4 rounded-2xl text-center shadow-sm">
                 <span class="text-xs text-slate-500 font-bold uppercase block">Toplam Öğrenci</span>
@@ -117,15 +138,14 @@
             </div>
         </div>
 
-        <!-- MODÜL / BÖLÜM SEÇİM BUTONLARI -->
         <div class="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
-            <button onclick="tabAc('tab-ogrenciler')" class="tab-btn bg-indigo-600 text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition shadow-sm">👥 Kayıtlı Öğrenciler</button>
-            <button onclick="tabAc('tab-ekle')" class="tab-btn bg-white text-slate-700 border border-slate-300 px-5 py-2.5 rounded-2xl text-xs font-bold transition shadow-sm">➕ Öğrenci / Not Ekle</button>
-            <button onclick="tabAc('tab-sinavlar')" class="tab-btn bg-white text-slate-700 border border-slate-300 px-5 py-2.5 rounded-2xl text-xs font-bold transition shadow-sm">📝 Sınav & Soru Yönetimi</button>
-            <button onclick="tabAc('tab-excel')" class="tab-btn bg-white text-slate-700 border border-slate-300 px-5 py-2.5 rounded-2xl text-xs font-bold transition shadow-sm">📊 Excel & Yedekleme</button>
+            <button id="btn-tab-ogrenciler" onclick="tabAc('tab-ogrenciler')" class="tab-btn bg-indigo-600 text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition shadow-sm">👥 Kayıtlı Öğrenciler</button>
+            <button id="btn-tab-ekle" onclick="tabAc('tab-ekle')" class="tab-btn bg-white text-slate-700 border border-slate-300 px-5 py-2.5 rounded-2xl text-xs font-bold transition shadow-sm">➕ Öğrenci / Not Ekle</button>
+            <button id="btn-tab-sinavlar" onclick="tabAc('tab-sinavlar')" class="tab-btn bg-white text-slate-700 border border-slate-300 px-5 py-2.5 rounded-2xl text-xs font-bold transition shadow-sm">📝 Sınav & Soru Yönetimi</button>
+            <button id="btn-tab-excel" onclick="tabAc('tab-excel')" class="tab-btn bg-white text-slate-700 border border-slate-300 px-5 py-2.5 rounded-2xl text-xs font-bold transition shadow-sm">📊 Excel & Yedekleme</button>
         </div>
 
-        <!-- 1. BÖLÜM: KAYITLI ÖĞRENCİLER LİSTESİ (TIKLAYINCA SONUÇLAR AÇILIR) -->
+        <!-- 1. BÖLÜM -->
         <div id="tab-ogrenciler" class="tab-icerik bg-white p-6 rounded-3xl border border-slate-200 shadow-xl space-y-4">
             <h3 class="text-base font-black text-slate-900">Kayıtlı Öğrenciler (Numara Sıralı - Tıklayınca Açılır)</h3>
             <p class="text-xs text-slate-500">Öğrenciye tıklayarak tüm sınav sonuçlarını görebilirsiniz.</p>
@@ -134,7 +154,6 @@
             <div class="space-y-3 max-h-[600px] overflow-y-auto pr-1">
                 {% for no, bilgi in veriler.items() %}
                 <div class="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden transition shadow-sm">
-                    <!-- TIKLANABİLİR BAŞLIK KARTI -->
                     <div onclick="ogrenciDetayToggle('{{ no }}')" class="p-4 cursor-pointer hover:bg-slate-100/80 flex flex-col sm:flex-row justify-between sm:items-center gap-2">
                         <div class="flex items-center gap-3">
                             <span class="bg-indigo-600 text-white text-xs font-black px-3 py-1 rounded-xl">No: {{ no }}</span>
@@ -147,7 +166,6 @@
                         </div>
                     </div>
 
-                    <!-- TIKLAYINCA AÇILAN DETAYLI SINAV LİSTESİ -->
                     <div id="detay_{{ no }}" class="hidden p-4 bg-white border-t border-slate-200 space-y-3">
                         <div class="flex justify-between items-center border-b border-slate-100 pb-2">
                             <span class="text-xs font-bold text-indigo-700">Sınav Sonuçları ve Geçmiş Karneleri</span>
@@ -176,12 +194,23 @@
             {% endif %}
         </div>
 
-        <!-- 2. BÖLÜM: ÖĞRENCİ VE NOT EKLEME -->
+        <!-- 2. BÖLÜM: ÖĞRENCİ VE NOT EKLE (AÇILIR LİSTE VE OTOMATİK TANIMA) -->
         <div id="tab-ekle" class="tab-icerik hidden bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xl space-y-4">
             <h2 class="text-base font-black text-slate-900">Öğrenci & Not Ekle / Güncelle</h2>
             <form action="/admin/kaydet" method="POST" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <input type="text" id="ogrenci_no_input" name="ogrenci_no" required placeholder="Öğrenci No" onblur="ogrenciGetir()" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold">
-                <input type="text" id="ad_input" name="ad" required placeholder="Ad Soyad (Otomatik Tanınır)" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold">
+                <input type="text" id="ogrenci_no_input" name="ogrenci_no" required placeholder="Öğrenci No" onblur="ogrenciGetirNo()" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold">
+                
+                <!-- İSTER YAZIN İSTER LİSTEDEN SEÇİN (AÇILIR KUTU) -->
+                <div class="relative">
+                    <select id="ad_select" onchange="ogrenciSecAd(this)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10">
+                        <option value="">-- Listeden Seç --</option>
+                        {% for no, b in veriler.items() %}
+                        <option value="{{ b.ad }}" data-no="{{ no }}">{{ no }} - {{ b.ad }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="text" id="ad_input" name="ad" required placeholder="Ad Soyad veya Listeden Seç ▾" onblur="ogrenciGetirNo()" class="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold">
+                </div>
+
                 <input type="text" name="sinav" required placeholder="Sınav Adı" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold">
                 <input type="number" name="dogru" placeholder="Doğru Sayısı" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs">
                 <input type="number" name="yanlis" placeholder="Yanlış Sayısı" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs">
@@ -192,7 +221,7 @@
             </form>
         </div>
 
-        <!-- 3. BÖLÜM: ÇOKLU SORU EKLEME VE TEST YÖNETİMİ -->
+        <!-- 3. BÖLÜM -->
         <div id="tab-sinavlar" class="tab-icerik hidden bg-white p-6 sm:p-8 rounded-3xl border border-indigo-200 shadow-xl space-y-6">
             <div class="border-b border-slate-100 pb-3">
                 <h2 class="text-lg font-black text-slate-900">Çoklu Soru Ekleme & Online Sınav Yönetimi</h2>
@@ -215,9 +244,7 @@
                     </div>
                 </div>
 
-                <!-- DİNAMİK SORU FORM ALANLARI -->
                 <div id="sorular_container" class="space-y-4 pt-2">
-                    <!-- Varsayılan 1. Soru -->
                     <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
                         <div class="font-bold text-xs text-indigo-700">Soru 1</div>
                         <input type="text" name="soru_metni_1" required placeholder="1. Soru cümlesi..." class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-xs font-medium">
@@ -242,7 +269,6 @@
                 <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl text-xs shadow transition">Tüm Soruları Kaydet 🚀</button>
             </form>
 
-            <!-- TEST YAYIN DURUMU -->
             {% if test_listesi %}
             <div class="pt-4 border-t border-slate-100">
                 <h3 class="text-xs font-bold text-slate-700 mb-2">Yayınlanmış Testler</h3>
@@ -263,7 +289,7 @@
             {% endif %}
         </div>
 
-        <!-- 4. BÖLÜM: EXCEL DOKÜMANLARI VE İNDİRME -->
+        <!-- 4. BÖLÜM -->
         <div id="tab-excel" class="tab-icerik hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-xl space-y-3">
                 <h3 class="text-xs font-bold text-slate-900">Excel Toplu Veri Yükleme</h3>

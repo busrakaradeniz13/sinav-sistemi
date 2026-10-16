@@ -27,7 +27,6 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 TURKEY_TZ = timezone(timedelta(hours=3))
 
 def db_baglantisi():
-    """PostgreSQL (Neon) bulut veritabanına güvenli bağlanır."""
     if DATABASE_URL:
         url = DATABASE_URL
         if "sslmode" not in url:
@@ -38,12 +37,10 @@ def db_baglantisi():
         raise Exception("DATABASE_URL ortam değişkeni bulunamadı!")
 
 def veritabani_kur():
-    """Bulut veritabanında tüm tabloları ve online sınav tablolarını otomatik oluşturur."""
     try:
         conn = db_baglantisi()
         cursor = conn.cursor()
 
-        # Öğrenciler tablosu
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS ogrenciler (
                 ogrenci_no TEXT PRIMARY KEY,
@@ -55,7 +52,6 @@ def veritabani_kur():
         cursor.execute("ALTER TABLE ogrenciler ADD COLUMN IF NOT EXISTS sorgu_sayisi INTEGER DEFAULT 0")
         cursor.execute("ALTER TABLE ogrenciler ADD COLUMN IF NOT EXISTS son_sorgu_tarihi TEXT DEFAULT '-'")
 
-        # Sınavlar (Karne / Notlar) tablosu
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS sinavlar (
                 id SERIAL PRIMARY KEY,
@@ -71,7 +67,6 @@ def veritabani_kur():
             )
         """)
 
-        # Genel Ziyaret ve Sorgulama Sayacı
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS istatistikler (
                 id INTEGER PRIMARY KEY,
@@ -85,8 +80,6 @@ def veritabani_kur():
             ON CONFLICT (id) DO NOTHING
         """)
 
-        # ONLINE SINAV MODÜLÜ TABLOLARI
-        # 1. Sorular Tablosu
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS sorular (
                 id SERIAL PRIMARY KEY,
@@ -100,7 +93,6 @@ def veritabani_kur():
             )
         """)
 
-        # 2. Test Ayarları ve Yayın Durumu Tablosu
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS test_ayarlari (
                 test_adi TEXT PRIMARY KEY,
@@ -109,7 +101,6 @@ def veritabani_kur():
             )
         """)
 
-        # 3. Öğrenci Online Sınav Sonuçları Tablosu
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS ogrenci_online_sonuclar (
                 id SERIAL PRIMARY KEY,
@@ -217,7 +208,6 @@ def veli_sorgula():
     if request.method == "GET":
         genel_istatistik_arttir("ziyaret")
 
-    # Yayınlanmış aktif online sınavları veritabanından çek
     try:
         conn = db_baglantisi()
         cursor = conn.cursor()
@@ -277,7 +267,6 @@ def veli_sorgula():
     )
 
 
-# --- ONLINE SINAV ÇÖZME SAYFASI ---
 @app.route("/online-sinav/<test_adi>/<ogrenci_no>", methods=["GET", "POST"])
 def online_sinav_coz(test_adi, ogrenci_no):
     sinav_verileri = sinav_verilerini_getir()
@@ -289,7 +278,6 @@ def online_sinav_coz(test_adi, ogrenci_no):
         conn = db_baglantisi()
         cursor = conn.cursor()
         
-        # Test ayarlarını al
         cursor.execute("SELECT * FROM test_ayarlari WHERE test_adi = %s AND yayinlandi = TRUE", (test_adi,))
         test_ayar = cursor.fetchone()
         if not test_ayar:
@@ -298,11 +286,9 @@ def online_sinav_coz(test_adi, ogrenci_no):
             conn.close()
             return redirect(url_for("veli_sorgula"))
 
-        # Daha önce çözmüş mü kontrol et
         cursor.execute("SELECT * FROM ogrenci_online_sonuclar WHERE ogrenci_no = %s AND test_adi = %s", (ogrenci_no, test_adi))
         daha_once_cozmus = cursor.fetchone()
 
-        # Soruları getir
         cursor.execute("SELECT * FROM sorular WHERE test_adi = %s ORDER BY id ASC", (test_adi,))
         sorular = cursor.fetchall()
 
@@ -327,11 +313,9 @@ def online_sinav_coz(test_adi, ogrenci_no):
                 else:
                     yanlis_sayisi += 1
 
-            # Puan hesapla (100 üzerinden)
             puan = int((dogru_sayisi / toplam_soru) * 100) if toplam_soru > 0 else 0
             tarih_str = datetime.now(TURKEY_TZ).strftime("%d.%m.%Y %H:%M")
 
-            # Sonucu kaydet
             cursor.execute(
                 """
                 INSERT INTO ogrenci_online_sonuclar (ogrenci_no, test_adi, dogru, yanlis, bos, puan, tarih)
@@ -341,7 +325,6 @@ def online_sinav_coz(test_adi, ogrenci_no):
                 (ogrenci_no, test_adi, dogru_sayisi, yanlis_sayisi, bos_sayisi, puan, tarih_str)
             )
 
-            # Ayrıca ana sinavlar tablosuna da ekle ki karneye işlensin
             cursor.execute(
                 """
                 INSERT INTO sinavlar (ogrenci_no, sinav, dogru, yanlis, bos, puan, derece)
@@ -379,13 +362,11 @@ def online_sinav_coz(test_adi, ogrenci_no):
         return redirect(url_for("veli_sorgula"))
 
 
-# --- ADMIN PANELİ ---
 @app.route("/admin", methods=["GET", "POST"])
 def admin_panel():
     sinav_verileri = sinav_verilerini_getir()
     toplam_ziyaret, toplam_sorgu = genel_istatistikleri_oku()
 
-    # Aktif testleri ve soruları admin için getir
     tum_sorular = []
     test_listesi = []
     try:
@@ -444,7 +425,6 @@ def admin_cikis():
     return redirect(url_for("admin_panel"))
 
 
-# --- YENİ: SORU EKLEME ROUTE ---
 @app.route("/admin/soru-ekle", methods=["POST"])
 def soru_ekle():
     if not session.get("admin_logged_in"):
@@ -464,7 +444,6 @@ def soru_ekle():
             conn = db_baglantisi()
             cursor = conn.cursor()
 
-            # Test ayarlarını kaydet veya güncelle (varsayılan olarak yayınlanmamış başlar)
             cursor.execute(
                 """
                 INSERT INTO test_ayarlari (test_adi, sure_dakika, yayinlandi)
@@ -474,312 +453,8 @@ def soru_ekle():
                 (test_adi, sure)
             )
 
-            # Soruyu ekle
             cursor.execute(
                 """
                 INSERT INTO sorular (test_adi, soru_metni, secenek_a, secenek_b, secenek_c, secenek_d, dogru_cevap)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """,
-                (test_adi, soru_metni, secenek_a, secenek_b, secenek_c, secenek_d, dogru_cevap)
-            )
-
-            conn.commit()
-            cursor.close()
-            conn.close()
-            flash("Soru başarıyla eklendi!", "success")
-        except Exception as e:
-            flash(f"Soru ekleme hatası: {e}", "error")
-
-    return redirect(url_for("admin_panel"))
-
-
-# --- YENİ: TESTİ YAYINLA / YAYINDAN KALDIR ---
-@app.route("/admin/test-yayinla/<test_adi>")
-def test_yayinla(test_adi):
-    if not session.get("admin_logged_in"):
-        return redirect(url_for("admin_panel"))
-
-    try:
-        conn = db_baglantisi()
-        cursor = conn.cursor()
-        # Mevcut yayın durumunu tersine çevir
-        cursor.execute("SELECT yayinlandi FROM test_ayarlari WHERE test_adi = %s", (test_adi,))
-        res = cursor.fetchone()
-        if res:
-            yeni_durum = not res["yayinlandi"]
-            cursor.execute("UPDATE test_ayarlari SET yayinlandi = %s WHERE test_adi = %s", (yeni_durum, test_adi))
-            conn.commit()
-            durum_metni = "yayına alındı!" if yeni_durum else "yayından kaldırıldı."
-            flash(f"'{test_adi'}' başarıyla {durum_metni}", "success")
-        cursor.close()
-        conn.close()
-    except Exception as e:
-        flash(f"İşlem hatası: {e}", "error")
-
-    return redirect(url_for("admin_panel"))
-
-
-# --- YENİ: SORU SİL ---
-@app.route("/admin/soru-sil/<int:soru_id>")
-def soru_sil(soru_id):
-    if not session.get("admin_logged_in"):
-        return redirect(url_for("admin_panel"))
-
-    try:
-        conn = db_baglantisi()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM sorular WHERE id = %s", (soru_id,))
-        conn.commit()
-        cursor.close()
-        conn.close()
-        flash("Soru silindi.", "info")
-    except Exception as e:
-        flash(f"Silme hatası: {e}", "error")
-
-    return redirect(url_for("admin_panel"))
-
-
-@app.route("/admin/ogrenci-ara/<ogrenci_no>")
-def ogrenci_ara(ogrenci_no):
-    if not session.get("admin_logged_in"):
-        return jsonify({"bulundu": False})
-
-    try:
-        conn = db_baglantisi()
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT ad FROM ogrenciler WHERE ogrenci_no = %s", (str(ogrenci_no).strip(),)
-        )
-        row = cursor.fetchone()
-        cursor.close()
-        conn.close()
-
-        if row:
-            return jsonify({"bulundu": True, "ad": row["ad"]})
-    except:
-        pass
-    return jsonify({"bulundu": False})
-
-
-@app.route("/admin/kaydet", methods=["POST"])
-def ogrenci_kaydet():
-    if not session.get("admin_logged_in"):
-        return redirect(url_for("admin_panel"))
-
-    ogrenci_no = request.form.get("ogrenci_no", "").strip()
-    ad = request.form.get("ad", "").strip()
-    sinav_adi = request.form.get("sinav", "Genel Sınav").strip()
-    derece = request.form.get("derece", "").strip()
-
-    if sinav_adi:
-        session["son_sinav_adi"] = sinav_adi
-
-    try:
-        dogru = int(request.form.get("dogru", 0))
-        yanlis = int(request.form.get("yanlis", 0))
-        bos = int(request.form.get("bos", 0))
-        puan = int(request.form.get("puan", 0))
-    except ValueError:
-        dogru, yanlis, bos, puan = 0, 0, 0, 0
-
-    if ogrenci_no and ad:
-        try:
-            conn = db_baglantisi()
-            cursor = conn.cursor()
-
-            cursor.execute(
-                """
-                    INSERT INTO ogrenciler (ogrenci_no, ad, sorgu_sayisi, son_sorgu_tarihi) 
-                    VALUES (%s, %s, 0, '-')
-                    ON CONFLICT (ogrenci_no) DO UPDATE SET ad = EXCLUDED.ad
-                """,
-                (ogrenci_no, ad),
-            )
-
-            cursor.execute(
-                """
-                    INSERT INTO sinavlar (ogrenci_no, sinav, dogru, yanlis, bos, puan, derece)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (ogrenci_no, sinav) DO UPDATE SET
-                        dogru = EXCLUDED.dogru,
-                        yanlis = EXCLUDED.yanlis,
-                        bos = EXCLUDED.bos,
-                        puan = EXCLUDED.puan,
-                        derece = EXCLUDED.derece
-                """,
-                (ogrenci_no, sinav_adi, dogru, yanlis, bos, puan, derece),
-            )
-
-            conn.commit()
-            cursor.close()
-            conn.close()
-
-            flash(f"Başarılı: {ad} - {sinav_adi} kaydedildi.", "success")
-        except Exception as e:
-            flash(f"Kayıt hatası: {str(e)}", "error")
-
-    return redirect(url_for("admin_panel"))
-
-
-@app.route("/admin/ogrenci-sil/<ogrenci_no>")
-def ogrenci_sil(ogrenci_no):
-    if not session.get("admin_logged_in"):
-        return redirect(url_for("admin_panel"))
-
-    try:
-        conn = db_baglantisi()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM sinavlar WHERE ogrenci_no = %s", (str(ogrenci_no),))
-        cursor.execute("DELETE FROM ogrenciler WHERE ogrenci_no = %s", (str(ogrenci_no),))
-        conn.commit()
-        cursor.close()
-        conn.close()
-        flash("Öğrenci veritabanından silindi.", "info")
-    except Exception as e:
-        flash(f"Silme hatası: {e}", "error")
-
-    return redirect(url_for("admin_panel"))
-
-
-@app.route("/admin/sinav-sil/<ogrenci_no>/<path:sinav_adi>")
-def sinav_sil(ogrenci_no, sinav_adi):
-    if not session.get("admin_logged_in"):
-        return redirect(url_for("admin_panel"))
-
-    try:
-        conn = db_baglantisi()
-        cursor = conn.cursor()
-        cursor.execute(
-            "DELETE FROM sinavlar WHERE ogrenci_no = %s AND sinav = %s",
-            (str(ogrenci_no), sinav_adi),
-        )
-        conn.commit()
-        cursor.close()
-        conn.close()
-        flash("Sınav sonucu silindi.", "info")
-    except Exception as e:
-        flash(f"Silme hatası: {e}", "error")
-
-    return redirect(url_for("admin_panel"))
-
-
-@app.route("/admin/excel-yukle", methods=["POST"])
-def excel_yukle():
-    if not session.get("admin_logged_in"):
-        return redirect(url_for("admin_panel"))
-
-    dosya = request.files.get("excel_dosya")
-    if dosya:
-        try:
-            df = pd.read_excel(dosya)
-            df.columns = [str(col).strip().lower() for col in df.columns]
-
-            conn = db_baglantisi()
-            cursor = conn.cursor()
-
-            for _, row in df.iterrows():
-                no = str(
-                    row.get("ogrenci_no", row.get("no", row.get("okul_no", "0")))
-                ).strip()
-                ad = str(row.get("ad", row.get("ad_soyad", "İsimsiz"))).strip()
-                sinav_adi = str(
-                    row.get("sinav", row.get("sinav_adi", "Genel Sınav"))
-                ).strip()
-
-                try:
-                    dogru = int(
-                        row.get("dogru", 0) if pd.notna(row.get("dogru", 0)) else 0
-                    )
-                    yanlis = int(
-                        row.get("yanlis", 0) if pd.notna(row.get("yanlis", 0)) else 0
-                    )
-                    bos = int(row.get("bos", 0) if pd.notna(row.get("bos", 0)) else 0)
-                    puan = int(row.get("puan", 0) if pd.notna(row.get("puan", 0)) else 0)
-                    derece = str(
-                        row.get("derece", "") if pd.notna(row.get("derece", "")) else ""
-                    ).strip()
-                    if derece == "nan":
-                        derece = ""
-                except:
-                    dogru, yanlis, bos, puan, derece = 0, 0, 0, 0, ""
-
-                if no and no != "nan":
-                    cursor.execute(
-                        """
-                            INSERT INTO ogrenciler (ogrenci_no, ad, sorgu_sayisi, son_sorgu_tarihi) 
-                            VALUES (%s, %s, 0, '-')
-                            ON CONFLICT (ogrenci_no) DO UPDATE SET ad = EXCLUDED.ad
-                        """,
-                        (no, ad),
-                    )
-
-                    cursor.execute(
-                        """
-                            INSERT INTO sinavlar (ogrenci_no, sinav, dogru, yanlis, bos, puan, derece)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s)
-                            ON CONFLICT (ogrenci_no, sinav) DO UPDATE SET
-                                dogru = EXCLUDED.dogru,
-                                yanlis = EXCLUDED.yanlis,
-                                bos = EXCLUDED.bos,
-                                puan = EXCLUDED.puan,
-                                derece = EXCLUDED.derece
-                        """,
-                        (no, sinav_adi, dogru, yanlis, bos, puan, derece),
-                    )
-
-            conn.commit()
-            cursor.close()
-            conn.close()
-
-            flash("Excel verileri bulut veritabanına aktarıldı!", "success")
-        except Exception as e:
-            flash(f"Excel yüklenirken hata: {str(e)}", "error")
-
-    return redirect(url_for("admin_panel"))
-
-
-@app.route("/admin/excel-indir")
-def excel_indir():
-    if not session.get("admin_logged_in"):
-        return redirect(url_for("admin_panel"))
-
-    try:
-        sinav_verileri = sinav_verilerini_getir()
-        satirlar = []
-
-        for no, bilgi in sinav_verileri.items():
-            ad = bilgi["ad"]
-            for s in bilgi["sinavlar"]:
-                satirlar.append({
-                    "ogrenci_no": no,
-                    "ad": ad,
-                    "sinav": s["sinav"],
-                    "dogru": s["dogru"],
-                    "yanlis": s["yanlis"],
-                    "bos": s["bos"],
-                    "puan": s["puan"],
-                    "derece": s.get("derece", ""),
-                })
-
-        df = pd.DataFrame(satirlar)
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine="openpyxl") as writer:
-            df.to_excel(writer, index=False)
-        output.seek(0)
-
-        return send_file(
-            output,
-            as_attachment=True,
-            download_name="Büşra Güngör Öğrenci Sınav Sonuçları.xlsx",
-            mimetype=(
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            ),
-        )
-    except Exception as e:
-        flash(f"İndirme sırasında bir hata oluştu: {str(e)}", "error")
-        return redirect(url_for("admin_panel"))
-
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)

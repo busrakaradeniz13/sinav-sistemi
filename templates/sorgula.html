@@ -55,13 +55,16 @@
         {% endif %}
 
         {% if sonuc %}
-        <!-- SARI TEBRİK MESAJI KUTUSU -->
-        <div class="bg-gradient-to-r from-amber-100 via-yellow-100 to-amber-100 border-2 border-amber-300 p-5 rounded-3xl shadow-lg text-center space-y-2">
-            <span class="text-2xl block">🎉 Tebrikler!</span>
-            <p class="text-sm font-black text-amber-900">Sevgili <span class="underline underline-offset-4 decoration-amber-500">{{ sonuc.ad }}</span>, gösterdiğin gayret ve başarıların için seni kutlar, başarılarının devamını dileriz!</p>
+        <!-- BÜYÜK SARI TEBRİK MESAJI KUTUSU -->
+        <div class="bg-gradient-to-r from-amber-200 via-yellow-100 to-amber-200 border-4 border-amber-400 p-6 sm:p-8 rounded-3xl shadow-2xl text-center space-y-3">
+            <span class="text-3xl block">🎉 Tebrikler! 🏆</span>
+            <h2 class="text-lg sm:text-xl font-black text-amber-950">Sevgili {{ sonuc.ad }}</h2>
+            <p class="text-sm sm:text-base font-bold text-amber-900 leading-relaxed">
+                Gösterdiğin gayret, azim ve elde ettiğin başarılar için seni gönülden kutlar, başarılarının devamını dileriz!
+            </p>
             {% if en_son_derece %}
-            <div class="pt-1">
-                <span class="bg-amber-500 text-white text-xs font-black px-4 py-1.5 rounded-full shadow-md inline-block animate-bounce">
+            <div class="pt-2">
+                <span class="bg-amber-600 text-white text-sm font-black px-6 py-2 rounded-full shadow-lg inline-block animate-bounce tracking-wide">
                     🏆 Sınıf {{ en_son_derece }}.si Oldunuz!
                 </span>
             </div>
@@ -105,7 +108,7 @@
             {% endif %}
 
             <div class="space-y-3">
-                <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Sınav Sonuçları ve Karne Geçmişi</h3>
+                <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Sınav Sonuçları ve Karne Geçmişi (En Yeni En Üstte)</h3>
                 {% if sonuc.sinavlar %}
                     <div class="space-y-3 max-h-96 overflow-y-auto pr-1">
                         {% for s in sonuc.sinavlar %}

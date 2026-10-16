@@ -8,21 +8,18 @@
 </head>
 <body class="bg-slate-900 min-h-screen text-slate-100 font-sans flex flex-col justify-between p-4">
 
-    <!-- ÜST BİLGİ VE SAYAÇ BARİ -->
     <header class="max-w-3xl w-full mx-auto bg-slate-800 p-4 rounded-2xl border border-slate-700 flex justify-between items-center shadow-lg">
         <div>
             <h1 class="text-base font-bold text-indigo-400">{{ test_adi }}</h1>
             <p class="text-xs text-slate-400">Öğrenci: <span class="text-white font-bold">{{ ogrenci.ad }}</span> (No: {{ ogrenci_no }})</p>
         </div>
         
-        <!-- GERİ SAYIM SAYACI -->
         <div class="bg-rose-950/80 border border-rose-500 px-4 py-2 rounded-xl text-rose-300 flex items-center gap-2 shadow-inner">
             <span class="text-xs uppercase font-bold tracking-wider">Kalan Süre:</span>
             <span id="sayac" class="text-lg font-black font-mono">00:00</span>
         </div>
     </header>
 
-    <!-- SINAV FORMU -->
     <main class="max-w-3xl w-full mx-auto my-6">
         {% if daha_once_cozmus %}
         <div class="bg-amber-950/50 border border-amber-500 p-6 rounded-2xl text-center space-y-4">
@@ -54,7 +51,6 @@
                     {{ soru.soru_metni }}
                 </div>
 
-                <!-- ŞIKLAR -->
                 <div class="space-y-3">
                     <label class="flex items-center gap-3 p-3.5 rounded-xl border border-slate-700 bg-slate-900/50 hover:bg-slate-700/50 cursor-pointer transition">
                         <input type="radio" name="soru_{{ soru.id }}" value="A" class="w-4 h-4 text-indigo-600 focus:ring-indigo-500">
@@ -80,9 +76,8 @@
             </div>
             {% endfor %}
 
-            <!-- NAVİGASYON BUTONLARI (İLERİ / GERİ / BİTİR) -->
             <div class="flex justify-between items-center bg-slate-800 p-4 rounded-2xl border border-slate-700">
-                <button type="button" id="geriBtn" onclick="soruDegistir(-1)" 
+                <button type="button" id="geriBtn" onclick="soruDegistir(-1)" disabled
                     class="bg-slate-700 hover:bg-slate-600 text-white font-bold px-5 py-2.5 rounded-xl text-xs transition disabled:opacity-30 disabled:cursor-not-allowed">
                     ⬅️ Önceki Soru
                 </button>
@@ -106,7 +101,6 @@
         {% endif %}
     </main>
 
-    <!-- SCRIPTS (SAYAÇ VE SORU GEÇİŞLERİ) -->
     <script>
         let toplamSoru = {{ sorular|length if sorular else 0 }};
         let simdikiIndex = 0;
@@ -123,9 +117,8 @@
 
             kutular[simdikiIndex].classList.remove('hidden');
 
-            // Buton ve gösterge güncellemeleri
             document.getElementById('geriBtn').disabled = (simdikiIndex === 0);
-            document.getElementById('sayfaGosterge.innerText') = `${simdikiIndex + 1} / ${toplamSoru}`;
+            document.getElementById('sayfaGosterge').innerText = `${simdikiIndex + 1} / ${toplamSoru}`;
             
             const ileriBtn = document.getElementById('ileriBtn');
             const bitirBtn = document.getElementById('bitirBtn');
@@ -137,14 +130,10 @@
                 ileriBtn.classList.remove('hidden');
                 bitirBtn.classList.add('hidden');
             }
-
-            document.getElementById('sayfaGosterge').innerText = `${simdikiIndex + 1} / ${toplamSoru}`;
         }
 
-        // GERİ SAYIM SAYACI (SÜRE)
         let sureDakika = {{ sure if sure else 30 }};
         let toplamSaniye = sureDakika * 60;
-
         const sayacElementi = document.getElementById('sayac');
 
         const timer = setInterval(() => {
@@ -154,11 +143,9 @@
                 document.getElementById('sinavFormu').submit();
                 return;
             }
-
             toplamSaniye--;
             let dk = Math.floor(toplamSaniye / 60);
             let sn = toplamSaniye % 60;
-
             sayacElementi.innerText = `${dk.toString().padStart(2, '0')}:${sn.toString().padStart(2, '0')}`;
         }, 1000);
     </script>

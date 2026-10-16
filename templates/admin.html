@@ -29,6 +29,13 @@
             }
         }
 
+        function dersSec(selectElement, targetInputId) {
+            let val = selectElement.value;
+            if(val) {
+                document.getElementById(targetInputId).value = val;
+            }
+        }
+
         function tabAc(tabId) {
             document.querySelectorAll('.tab-icerik').forEach(el => el.classList.add('hidden'));
             document.querySelectorAll('.tab-btn').forEach(el => {
@@ -117,22 +124,29 @@
         </div>
         {% else %}
 
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div class="bg-white border border-slate-200 p-4 rounded-2xl text-center shadow-sm">
-                <span class="text-xs text-slate-500 font-bold uppercase block">Toplam Öğrenci</span>
-                <span class="text-2xl font-black text-indigo-600">{{ veriler|length }}</span>
+        <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full">
+                <div class="bg-white border border-slate-200 p-4 rounded-2xl text-center shadow-sm">
+                    <span class="text-xs text-slate-500 font-bold uppercase block">Toplam Öğrenci</span>
+                    <span class="text-2xl font-black text-indigo-600">{{ veriler|length }}</span>
+                </div>
+                <div class="bg-white border border-slate-200 p-4 rounded-2xl text-center shadow-sm">
+                    <span class="text-xs text-slate-500 font-bold uppercase block">Oluşturulan Testler</span>
+                    <span class="text-2xl font-black text-emerald-600">{{ test_listesi|length }}</span>
+                </div>
+                <div class="bg-white border border-slate-200 p-4 rounded-2xl text-center shadow-sm">
+                    <span class="text-xs text-slate-500 font-bold uppercase block">Site Ziyareti</span>
+                    <span class="text-2xl font-black text-amber-600">{{ toplam_ziyaret }}</span>
+                </div>
+                <div class="bg-white border border-slate-200 p-4 rounded-2xl text-center shadow-sm">
+                    <span class="text-xs text-slate-500 font-bold uppercase block">Toplam Sorgu</span>
+                    <span class="text-2xl font-black text-sky-600">{{ toplam_sorgu }}</span>
+                </div>
             </div>
-            <div class="bg-white border border-slate-200 p-4 rounded-2xl text-center shadow-sm">
-                <span class="text-xs text-slate-500 font-bold uppercase block">Oluşturulan Testler</span>
-                <span class="text-2xl font-black text-emerald-600">{{ test_listesi|length }}</span>
-            </div>
-            <div class="bg-white border border-slate-200 p-4 rounded-2xl text-center shadow-sm">
-                <span class="text-xs text-slate-500 font-bold uppercase block">Site Ziyareti</span>
-                <span class="text-2xl font-black text-amber-600">{{ toplam_ziyaret }}</span>
-            </div>
-            <div class="bg-white border border-slate-200 p-4 rounded-2xl text-center shadow-sm">
-                <span class="text-xs text-slate-500 font-bold uppercase block">Toplam Sorgu</span>
-                <span class="text-2xl font-black text-sky-600">{{ toplam_sorgu }}</span>
+            <div>
+                <a href="/admin/sayaclari-sifirla" onclick="return confirm('Tüm ziyaret, sorgu sayaçları ve öğrenci bakılma sayıları sıfırlanacak. Emin misiniz?')" class="bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300 px-4 py-4 rounded-2xl text-xs font-black transition flex items-center gap-1.5 shadow-sm whitespace-nowrap">
+                    <span>🔄</span> Sayaçları Sıfırla
+                </a>
             </div>
         </div>
 
@@ -192,15 +206,15 @@
             {% endif %}
         </div>
 
-        <!-- 2. BÖLÜM: ÖĞRENCİ & NOT EKLE (SERBEST İSİM YAZMA & SEÇMELİ DROPDOWN) -->
+        <!-- 2. BÖLÜM -->
         <div id="tab-ekle" class="tab-icerik hidden bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xl space-y-4">
             <h2 class="text-base font-black text-slate-900">Öğrenci & Not Ekle / Güncelle</h2>
             <form action="/admin/kaydet" method="POST" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <input type="text" id="ogrenci_no_input" name="ogrenci_no" required placeholder="Öğrenci No" onblur="ogrenciGetirNo()" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold">
                 
-                <!-- Serbest yazı yazılabilen ve yandaki butondan eski öğrencilerin seçilebildiği alan -->
+                <!-- Ad Soyad: Hem Yaz hem Seç -->
                 <div class="flex gap-1">
-                    <input type="text" id="ad_input" name="ad" required placeholder="Ad Soyad (Yeni yazabilirsin)" onblur="ogrenciGetirNo()" class="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold">
+                    <input type="text" id="ad_input" name="ad" required placeholder="Ad Soyad (Yeni yazabilirsiniz)" onblur="ogrenciGetirNo()" class="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold">
                     <select onchange="ogrenciSecAd(this)" title="Kayıtlı Öğrencilerden Seç" class="bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-xl px-2 text-xs cursor-pointer font-bold">
                         <option value="">Kayıtlı Seç ▾</option>
                         {% for no, b in veriler.items() %}
@@ -209,14 +223,15 @@
                     </select>
                 </div>
 
-                <div class="relative">
-                    <select onchange="document.getElementById('sinav_input').value=this.value;" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10">
-                        <option value="">-- Kayıtlı Sınavlar / Dersler --</option>
+                <!-- Sınav Adı: Hem Yaz hem Seç -->
+                <div class="flex gap-1">
+                    <input type="text" id="sinav_input" name="sinav" required placeholder="Sınav / Ders Adı (Yeni yazabilirsiniz)" class="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold">
+                    <select onchange="dersSec(this, 'sinav_input')" title="Kayıtlı Derslerden Seç" class="bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-xl px-2 text-xs cursor-pointer font-bold">
+                        <option value="">Kayıtlı Seç ▾</option>
                         {% for d in kayitli_dersler %}
                         <option value="{{ d }}">{{ d }}</option>
                         {% endfor %}
                     </select>
-                    <input type="text" id="sinav_input" name="sinav" required placeholder="Sınav Adı (Yaz veya Seç ▾)" class="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold">
                 </div>
 
                 <input type="number" name="dogru" placeholder="Doğru Sayısı" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs">
@@ -237,9 +252,18 @@
 
             <form action="/admin/coklu-soru-ekle" method="POST" enctype="multipart/form-data" class="space-y-4">
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <!-- Sınav Adı Ekleme: Hem Yaz hem Seç -->
                     <div>
                         <label class="block text-xs font-bold text-slate-600 mb-1">Test / Sınav Adı</label>
-                        <input type="text" name="test_adi" required placeholder="Örn: 1. Matematik Denemesi" class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold">
+                        <div class="flex gap-1">
+                            <input type="text" id="test_adi_input" name="test_adi" required placeholder="Örn: 1. Matematik Denemesi" class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold">
+                            <select onchange="dersSec(this, 'test_adi_input')" title="Kayıtlı Derslerden Seç" class="bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-xl px-2 text-xs cursor-pointer font-bold">
+                                <option value="">Kayıtlı Seç ▾</option>
+                                {% for d in kayitli_dersler %}
+                                <option value="{{ d }}">{{ d }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-slate-600 mb-1">Deneme Süresi (Dakika)</label>

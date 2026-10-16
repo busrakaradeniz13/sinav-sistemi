@@ -80,6 +80,7 @@ def veritabani_kur():
             ON CONFLICT (id) DO NOTHING
         """)
 
+        # ONLINE SINAV TABLOLARI
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS sorular (
                 id SERIAL PRIMARY KEY,
@@ -267,6 +268,7 @@ def veli_sorgula():
     )
 
 
+# --- ONLINE SINAV ÇÖZME SAYFASI ---
 @app.route("/online-sinav/<test_adi>/<ogrenci_no>", methods=["GET", "POST"])
 def online_sinav_coz(test_adi, ogrenci_no):
     sinav_verileri = sinav_verilerini_getir()

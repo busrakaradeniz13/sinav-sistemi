@@ -17,7 +17,7 @@ from flask import (
 import pandas as pd
 
 app = Flask(__name__)
-app.secret_key = "uzman_ogretmen_guvenli_sistem_key_2026"
+app.secret_key = "ogretmen_cok_gizli_guvenlik_anahtari_98765"
 
 ADMIN_PASSWORD = "15698"
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -55,7 +55,6 @@ def veritabani_kur():
                 bos INTEGER DEFAULT 0,
                 puan INTEGER DEFAULT 0,
                 derece TEXT DEFAULT '',
-                sure_saniye INTEGER DEFAULT 0,
                 FOREIGN KEY (ogrenci_no) REFERENCES ogrenciler (ogrenci_no) ON DELETE CASCADE,
                 UNIQUE(ogrenci_no, sinav)
             )
@@ -105,7 +104,6 @@ def veritabani_kur():
         conn.commit()
         cursor.close()
         conn.close()
-        print("Veritabanı ve tüm tablolar hazır.")
     except Exception as e:
         print(f"DB Kurulum Hatası: {e}")
 
@@ -115,7 +113,6 @@ def sinav_verilerini_getir():
     try:
         conn = db_baglantisi()
         cursor = conn.cursor()
-        # Öğrenci numarasına göre küçükten büyüğe sıralı getir
         cursor.execute("SELECT * FROM ogrenciler ORDER BY ogrenci_no ASC")
         ogrenci_satirlari = cursor.fetchall()
 
@@ -145,27 +142,8 @@ def veli_sorgula():
     sonuc, hata = None, None
     en_son_derece = None
     sinav_verileri = sinav_verilerini_getir()
-
-    if request.method == "POST":
-        ogrenci_no = request.form.get("ogrenci_no", "").strip()
-        if not ogrenci_no:
-            hata = "Lütfen okul numarası giriniz."
-        elif ogrenci_no in sinav_verileri:
-            ham = sinav_verileri[ogrenci_no]
-            ters_sinavlar = list(reversed(ham["sinavlar"]))
-            sonuc = {"ogrenci_no": ogrenci_no, "ad": ham["ad"], "sinavlar": ters_sinavlar}
-            if ters_sinavlar:
-                d = str(ters_sinavlar[0].get("derece", "")).strip().lower()
-                if d in ["1", "2", "3"]:
-                    en_son_derece = d
-        else:
-            hata = "Bu numaraya ait öğrenci bulunamadı."
-
-    return render_template("sorgula.html", sonuc=sonuc, hata=hata, en_son_derece=en_son_derece)
-
-@app.route("/online-sinav-giris", methods=["GET", "POST"])
-def online_sinav_giris():
     aktif_testler = []
+
     try:
         conn = db_baglantisi()
         cursor = conn.cursor()
@@ -176,21 +154,22 @@ def online_sinav_giris():
     except:
         pass
 
-    ogrenci = None
-    secilen_test = request.args.get("test", "")
-    ogrenci_no = request.args.get("ogrenci_no", "").strip()
-
     if request.method == "POST":
         ogrenci_no = request.form.get("ogrenci_no", "").strip()
-        secilen_test = request.form.get("test_adi", "").strip()
-        
-        sinav_verileri = sinav_verilerini_getir()
-        if ogrenci_no in sinav_verileri and secilen_test:
-            return redirect(url_for('online_sinav_coz', test_adi=secilen_test, ogrenci_no=ogrenci_no))
+        if not ogrenci_no:
+            hata = "Lütfen okul numarası giriniz."
+        elif ogrenci_no in sinav_verileri:
+            ham = sinav_verileri[ogrenci_no]
+            ters_sinavlar = list(reversed(ham["sinavlar"]))
+            sonuc = {"ogrenci_no": ogrenci_no, "ad": ham["ad"], "sinavlar": ters_sinavlar}
+            if ters_sinavlar:
+                d = str(ters_sinavlar[0].get("derece", "")).replace(".", "").strip().lower()
+                if d in ["1", "2", "3"]:
+                    en_son_derece = d
         else:
-            flash("Geçersiz öğrenci numarası veya test seçilmedi!", "error")
+            hata = "Bu numaraya ait öğrenci veya sınav sonucu bulunamadı."
 
-    return render_template("online_giris.html", aktif_testler=aktif_testler, ogrenci_no=ogrenci_no, secilen_test=secilen_test)
+    return render_template("sorgula.html", sonuc=sonuc, hata=hata, en_son_derece=en_son_derece, aktif_testler=aktif_testler)
 
 @app.route("/online-sinav/<test_adi>/<ogrenci_no>", methods=["GET", "POST"])
 def online_sinav_coz(test_adi, ogrenci_no):
@@ -205,8 +184,8 @@ def online_sinav_coz(test_adi, ogrenci_no):
         cursor.execute("SELECT * FROM test_ayarlari WHERE test_adi = %s AND yayinlandi = TRUE", (test_adi,))
         test_ayar = cursor.fetchone()
         if not test_ayar:
-            flash("Bu sınav aktif değil.", "error")
-            return redirect(url_for("online_sinav_giris"))
+            flash("Bu sınav aktif değil veya yayınlanmamış.", "error")
+            return redirect(url_for("veli_sorgula"))
 
         cursor.execute("SELECT * FROM ogrenci_online_sonuclar WHERE ogrenci_no = %s AND test_adi = %s", (ogrenci_no, test_adi))
         daha_once = cursor.fetchone()
@@ -251,14 +230,14 @@ def online_sinav_coz(test_adi, ogrenci_no):
             cursor.close()
             conn.close()
 
-            flash(f"Sınav tamamlandı! Puanınız: {puan}", "success")
+            flash(f"Sınav başarıyla tamamlandı! Puanınız: {puan}", "success")
             return redirect(url_for("veli_sorgula"))
 
         cursor.close()
         conn.close()
         return render_template("sinav_coz.html", ogrenci=sinav_verileri[ogrenci_no], ogrenci_no=ogrenci_no, test_adi=test_adi, sure=test_ayar["sure_dakika"], sorular=sorular, daha_once=daha_once)
     except Exception as e:
-        flash(f"Hata: {e}", "error")
+        flash(f"Sınav yüklenirken hata: {e}", "error")
         return redirect(url_for("veli_sorgula"))
 
 @app.route("/admin", methods=["GET", "POST"])
@@ -386,7 +365,7 @@ def ogrenci_kaydet():
             conn.commit()
             cursor.close()
             conn.close()
-            flash("Kayıt güncellendi.", "success")
+            flash("Kayıt başarıyla eklendi / güncellendi.", "success")
         except Exception as e:
             flash(f"Hata: {e}", "error")
     return redirect(url_for("admin_panel"))
@@ -403,6 +382,21 @@ def ogrenci_sil(ogrenci_no):
         cursor.close()
         conn.close()
         flash("Öğrenci silindi.", "info")
+    except:
+        pass
+    return redirect(url_for("admin_panel"))
+
+@app.route("/admin/sinav-sil/<ogrenci_no>/<path:sinav_adi>")
+def sinav_sil(ogrenci_no, sinav_adi):
+    if not session.get("admin_logged_in"): return redirect(url_for("admin_panel"))
+    try:
+        conn = db_baglantisi()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM sinavlar WHERE ogrenci_no = %s AND sinav = %s", (str(ogrenci_no), sinav_adi))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        flash("Sınav sonucu silindi.", "info")
     except:
         pass
     return redirect(url_for("admin_panel"))
@@ -440,7 +434,7 @@ def excel_yukle():
             conn.commit()
             cursor.close()
             conn.close()
-            flash("Excel başarıyla yüklendi!", "success")
+            flash("Excel verileri aktarıldı!", "success")
         except Exception as e:
             flash(f"Excel hatası: {e}", "error")
     return redirect(url_for("admin_panel"))
@@ -453,13 +447,13 @@ def excel_indir():
         satirlar = []
         for no, bilgi in veriler.items():
             for s in bilgi["sinavlar"]:
-                satirlar.append({"ogrenci_no": no, "ad": bilgi["ad"], **s})
+                satirlar.append({"ogrenci_no": no, "ad": bilgi["ad"], "sinav": s["sinav"], "dogru": s["dogru"], "yanlis": s["yanlis"], "bos": s["bos"], "puan": s["puan"], "derece": s.get("derece", "")})
         df = pd.DataFrame(satirlar)
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
             df.to_excel(writer, index=False)
         output.seek(0)
-        return send_file(output, as_attachment=True, download_name="Oguz_Sınav_Sonuclari.xlsx", mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        return send_file(output, as_attachment=True, download_name="Ogretmen_Sinav_Sonuclari.xlsx", mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     except:
         return redirect(url_for("admin_panel"))
 

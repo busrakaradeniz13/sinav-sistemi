@@ -17,7 +17,7 @@ from flask import (
 import pandas as pd
 
 app = Flask(__name__)
-app.secret_key = "uzman_ogretmen_guvenli_sistem_key_2026_v6"
+app.secret_key = "uzman_ogretmen_guvenli_sistem_key_2026_v7"
 
 ADMIN_PASSWORD = "15698"
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -137,10 +137,10 @@ def sinav_verilerini_getir():
         ogrenci_satirlari = cursor.fetchall()
         veriler = {}
         for ogrenci in ogrenci_satirlari:
-            no = ogrenci["ogrenci_no"]
+            no = str(ogrenci["ogrenci_no"]).strip()
             ad = ogrenci["ad"]
             
-            # En son eklenen sınav en üstte gözüksün diye id'ye göre azalan (DESC) sıralıyoruz
+            # En son eklenen sınav en üstte (id DESC)
             cursor.execute("SELECT * FROM sinavlar WHERE ogrenci_no = %s ORDER BY id DESC", (no,))
             sinavlar = [dict(s) for s in cursor.fetchall()]
 
@@ -223,10 +223,12 @@ def veli_sorgula():
                 print(f"Sorgu sayaç güncelleme hatası: {e}")
 
             ham = sinav_verileri[ogrenci_no]
-            # Zaten id DESC sıralı geldiği için doğrudan ham["sinavlar"] en son sınavı en üste getirir
             sonuc = {"ogrenci_no": ogrenci_no, "ad": ham["ad"], "sinavlar": ham["sinavlar"]}
-            if ham["sinavlar"]:
-                d = str(ham["sinavlar"][0].get("derece", "")).replace(".", "").strip().lower()
+            
+            # SADECE EN SON SINAV DERECE KONTROLÜ (1, 2 veya 3 ise)
+            if ham["sinavlar"] and len(ham["sinavlar"]) > 0:
+                en_son_sinav = ham["sinavlar"][0]
+                d = str(en_son_sinav.get("derece", "")).replace(".", "").strip().lower()
                 if d in ["1", "2", "3"]:
                     en_son_derece = d
         else:
@@ -490,54 +492,96 @@ def excel_yukle():
     if dosya:
         try:
             df = pd.read_excel(dosya)
+            # Sütun isimlerini küçük harfe çevir ve temizle
             df.columns = [str(col).strip().lower() for col in df.columns]
+            
             conn = db_baglantisi()
             cursor = conn.cursor()
+            sayac = 0
             for _, row in df.iterrows():
-                no = str(row.get("ogrenci_no", row.get("no", row.get("okul_no", "0")))).strip()
-                ad = str(row.get("ad", row.get("ad_soyad", "İsimsiz"))).strip()
-                sinav_adi = str(row.get("sinav", row.get("sinav_adi", "Genel"))).strip()
+                # Farklı sütun isimlerini yakala
+                no = str(row.get("ogrenci_no", row.get("no", row.get("okul_no", row.get("ogrenci no", ""))))).strip()
+                if not no or no == "nan" or no == "0":
+                    continue
+                
+                ad = str(row.get("ad", row.get("ad_soyad", row.get("isim", row.get("ad soyad", "İsimsiz"))))).strip()
+                sinav_adi = str(row.get("sinav", row.get("sinav_adi", row.get("ders", row.get("sinav adi", "Genel Sınav"))))).strip()
+                
                 try:
                     dogru = int(row.get("dogru", 0))
+                except: dogru = 0
+                try:
                     yanlis = int(row.get("yanlis", 0))
+                except: yanlis = 0
+                try:
                     bos = int(row.get("bos", 0))
+                except: bos = 0
+                try:
                     puan = int(row.get("puan", 0))
-                    derece = str(row.get("derece", "")).strip()
-                    if derece == "nan": derece = ""
-                except:
-                    dogru, yanlis, bos, puan, derece = 0, 0, 0, 0, ""
-                if no and no != "nan":
-                    cursor.execute("INSERT INTO ogrenciler (ogrenci_no, ad) VALUES (%s, %s) ON CONFLICT (ogrenci_no) DO UPDATE SET ad = EXCLUDED.ad", (no, ad))
-                    cursor.execute("""
-                        INSERT INTO sinavlar (ogrenci_no, sinav, dogru, yanlis, bos, puan, derece)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s)
-                        ON CONFLICT (ogrenci_no, sinav) DO UPDATE SET dogru = EXCLUDED.dogru, yanlis = EXCLUDED.yanlis, bos = EXCLUDED.bos, puan = EXCLUDED.puan, derece = EXCLUDED.derece
-                    """, (no, sinav_adi, dogru, yanlis, bos, puan, derece))
+                except: puan = 0
+                
+                derece = str(row.get("derece", "")).strip()
+                if derece == "nan": derece = ""
+
+                cursor.execute("INSERT INTO ogrenciler (ogrenci_no, ad) VALUES (%s, %s) ON CONFLICT (ogrenci_no) DO UPDATE SET ad = EXCLUDED.ad", (no, ad))
+                cursor.execute("""
+                    INSERT INTO sinavlar (ogrenci_no, sinav, dogru, yanlis, bos, puan, derece)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (ogrenci_no, sinav) DO UPDATE SET dogru = EXCLUDED.dogru, yanlis = EXCLUDED.yanlis, bos = EXCLUDED.bos, puan = EXCLUDED.puan, derece = EXCLUDED.derece
+                """, (no, sinav_adi, dogru, yanlis, bos, puan, derece))
+                sayac += 1
+
             conn.commit()
             cursor.close()
             conn.close()
-            flash("Excel aktarıldı!", "success")
+            flash(f"Excel başarıyla aktarıldı! ({sayac} kayıt işlendi)", "success")
         except Exception as e:
-            flash(f"Excel hatası: {e}", "error")
+            flash(f"Excel yükleme hatası: {e}", "error")
     return redirect(url_for("admin_panel", tab="tab-excel"))
 
 @app.route("/admin/excel-indir")
 def excel_indir():
     if not session.get("admin_logged_in"): return redirect(url_for("admin_panel"))
     try:
-        veriler = sinav_verilerini_getir()
-        satirlar = []
-        for no, bilgi in veriler.items():
-            for s in bilgi["sinavlar"]:
-                satirlar.append({"ogrenci_no": no, "ad": bilgi["ad"], "sinav": s["sinav"], "dogru": s["dogru"], "yanlis": s["yanlis"], "bos": s["bos"], "puan": s["puan"], "derece": s.get("derece", "")})
-        df = pd.DataFrame(satirlar)
+        conn = db_baglantisi()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT o.ogrenci_no, o.ad, s.sinav, s.dogru, s.yanlis, s.bos, s.puan, s.derece 
+            FROM ogrenciler o 
+            LEFT JOIN sinavlar s ON o.ogrenci_no = s.ogrenci_no 
+            ORDER BY CAST(o.ogrenci_no AS INTEGER) ASC, s.id DESC
+        """)
+        satirlar = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        export_data = []
+        for r in satirlar:
+            export_data.append({
+                "Öğrenci No": r["ogrenci_no"],
+                "Ad Soyad": r["ad"],
+                "Sınav / Ders Adı": r["sinav"] if r["sinav"] else "-",
+                "Doğru": r["dogru"] if r["dogru"] is not None else 0,
+                "Yanlış": r["yanlis"] if r["yanlis"] is not None else 0,
+                "Boş": r["bos"] if r["bos"] is not None else 0,
+                "Puan": r["puan"] if r["puan"] is not None else 0,
+                "Derece": r["derece"] if r["derece"] else ""
+            })
+
+        df = pd.DataFrame(export_data)
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
-            df.to_excel(output, index=False)
+            df.to_excel(writer, index=False, sheet_name="Sınav Sonuçları")
         output.seek(0)
-        return send_file(output, as_attachment=True, download_name="Ogretmen_Sinav_Sonuclari.xlsx", mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    except:
-        return redirect(url_for("admin_panel"))
+        return send_file(
+            output, 
+            as_attachment=True, 
+            download_name="Ogretmen_Sinav_Sonuclari_Tüm_Liste.xlsx", 
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    except Exception as e:
+        flash(f"Excel indirme hatası: {e}", "error")
+        return redirect(url_for("admin_panel", tab="tab-excel"))
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))

@@ -13,8 +13,35 @@
         .kutlama-animasyon {
             animation: kutlamaParlama 2.4s ease-in-out infinite;
         }
+        @keyframes konfetiDususu {
+            0% {
+                transform: translate3d(0, -16px, 0) rotate(0deg);
+                opacity: 1;
+            }
+            85% {
+                opacity: 1;
+            }
+            100% {
+                transform: translate3d(var(--drift, 24px), 92vh, 0) rotate(var(--spin, 540deg));
+                opacity: 0;
+            }
+        }
+        #konfeti-katmani {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            overflow: hidden;
+            z-index: 50;
+        }
+        .konfeti-parcasi {
+            position: absolute;
+            top: -18px;
+            border-radius: 2px;
+            will-change: transform, opacity;
+            animation: konfetiDususu var(--sure, 3.4s) cubic-bezier(0.22, 0.61, 0.36, 1) var(--gecikme, 0s) forwards;
+        }
         @media print {
-            .no-print {
+            .no-print, #konfeti-katmani {
                 display: none !important;
             }
             body {
@@ -38,9 +65,58 @@
             input.focus();
             input.select();
         }
+
+        function konfetiBaslat(derece) {
+            const katman = document.getElementById('konfeti-katmani');
+            if (!katman || !['1', '2', '3'].includes(String(derece))) return;
+            katman.innerHTML = '';
+
+            const renkler = derece === '1'
+                ? ['#f59e0b', '#eab308', '#4f46e5', '#10b981', '#ec4899', '#f97316']
+                : derece === '2'
+                ? ['#4f46e5', '#0ea5e9', '#6366f1', '#10b981', '#f59e0b', '#8b5cf6']
+                : ['#f97316', '#f59e0b', '#10b981', '#4f46e5', '#ec4899', '#06b6d4'];
+
+            const parcaSayisi = derece === '1' ? 65 : 45;
+
+            for (let i = 0; i < parcaSayisi; i++) {
+                const parca = document.createElement('span');
+                parca.className = 'konfeti-parcasi';
+
+                const genislik = Math.floor(Math.random() * 7) + 6;
+                const yukseklik = Math.floor(Math.random() * 8) + 8;
+                const solYuzde = (Math.random() * 98).toFixed(2);
+                const gecikme = (Math.random() * 0.9).toFixed(2);
+                const sure = (Math.random() * 1.6 + 2.6).toFixed(2);
+                const kayma = Math.floor(Math.random() * 120 - 60);
+                const donus = (Math.random() > 0.5 ? 1 : -1) * (Math.floor(Math.random() * 540) + 270);
+                const renk = renkler[i % renkler.length];
+
+                parca.style.left = solYuzde + '%';
+                parca.style.width = genislik + 'px';
+                parca.style.height = yukseklik + 'px';
+                parca.style.backgroundColor = renk;
+                parca.style.setProperty('--gecikme', gecikme + 's');
+                parca.style.setProperty('--sure', sure + 's');
+                parca.style.setProperty('--drift', kayma + 'px');
+                parca.style.setProperty('--spin', donus + 'deg');
+
+                if (i % 4 === 0) {
+                    parca.style.borderRadius = '9999px';
+                }
+
+                katman.appendChild(parca);
+            }
+
+            setTimeout(() => {
+                katman.innerHTML = '';
+            }, 5600);
+        }
     </script>
 </head>
 <body class="bg-gradient-to-br from-slate-100 via-indigo-50/40 to-slate-100 min-h-screen text-slate-800 font-sans p-4 sm:p-6 selection:bg-indigo-600 selection:text-white">
+    <div id="konfeti-katmani" aria-hidden="true"></div>
+
     <div class="max-w-4xl mx-auto space-y-6">
 
         <!-- ÜST BAŞLIK -->
@@ -137,8 +213,11 @@
                     </p>
                 </div>
             </div>
-            <div class="bg-white/90 text-amber-900 px-4 py-2 rounded-2xl text-xs font-black shrink-0 shadow-sm">
-                🏆 1. SIRA
+            <div class="flex items-center gap-2 shrink-0">
+                <button type="button" onclick="konfetiBaslat('1')" class="no-print bg-white/80 hover:bg-white text-amber-950 px-3 py-2 rounded-2xl text-xs font-black transition shadow-sm">🎊 Konfeti</button>
+                <div class="bg-white/90 text-amber-900 px-4 py-2 rounded-2xl text-xs font-black shadow-sm">
+                    🏆 1. SIRA
+                </div>
             </div>
         </div>
         {% elif en_son_derece == "2" %}
@@ -153,8 +232,11 @@
                     </p>
                 </div>
             </div>
-            <div class="bg-white text-indigo-800 border border-indigo-200 px-4 py-2 rounded-2xl text-xs font-black shrink-0 shadow-sm">
-                🥈 2. SIRA
+            <div class="flex items-center gap-2 shrink-0">
+                <button type="button" onclick="konfetiBaslat('2')" class="no-print bg-white hover:bg-slate-50 text-indigo-900 border border-indigo-200 px-3 py-2 rounded-2xl text-xs font-black transition shadow-sm">🎊 Konfeti</button>
+                <div class="bg-white text-indigo-800 border border-indigo-200 px-4 py-2 rounded-2xl text-xs font-black shadow-sm">
+                    🥈 2. SIRA
+                </div>
             </div>
         </div>
         {% elif en_son_derece == "3" %}
@@ -169,10 +251,21 @@
                     </p>
                 </div>
             </div>
-            <div class="bg-white text-orange-900 border border-orange-200 px-4 py-2 rounded-2xl text-xs font-black shrink-0 shadow-sm">
-                🥉 3. SIRA
+            <div class="flex items-center gap-2 shrink-0">
+                <button type="button" onclick="konfetiBaslat('3')" class="no-print bg-white hover:bg-orange-50 text-orange-950 border border-orange-200 px-3 py-2 rounded-2xl text-xs font-black transition shadow-sm">🎊 Konfeti</button>
+                <div class="bg-white text-orange-900 border border-orange-200 px-4 py-2 rounded-2xl text-xs font-black shadow-sm">
+                    🥉 3. SIRA
+                </div>
             </div>
         </div>
+        {% endif %}
+
+        {% if en_son_derece in ["1", "2", "3"] %}
+        <script>
+            window.addEventListener('DOMContentLoaded', () => {
+                konfetiBaslat("{{ en_son_derece }}");
+            });
+        </script>
         {% endif %}
 
         {% set sinav_sayisi = sonuc.sinavlar|length if sonuc.sinavlar else 0 %}

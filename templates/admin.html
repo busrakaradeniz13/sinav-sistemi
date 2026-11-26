@@ -6,6 +6,8 @@
     <title>Öğretmen Yönetim Paneli</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
+        let puanManuelDegistirildi = false;
+
         function ogrenciGetirNo() {
             let no = document.getElementById('ogrenci_no_input').value.trim();
             if(!no) return;
@@ -36,8 +38,34 @@
             }
         }
 
+        function puanOtomatikHesapla(zorla = false) {
+            let puanEl = document.getElementById('puan_input');
+            if(!puanEl) return;
+            if(puanManuelDegistirildi && !zorla) return;
+
+            let d = parseInt(document.getElementById('dogru_input').value) || 0;
+            let y = parseInt(document.getElementById('yanlis_input').value) || 0;
+            let b = parseInt(document.getElementById('bos_input').value) || 0;
+
+            if(d < 0) d = 0;
+            if(y < 0) y = 0;
+            if(b < 0) b = 0;
+
+            let toplam = d + y + b;
+            if(toplam > 0) {
+                puanEl.value = Math.round((d / toplam) * 100);
+            } else {
+                puanEl.value = 0;
+            }
+        }
+
+        function puanManuelIsaretle() {
+            puanManuelDegistirildi = true;
+        }
+
         function sinavDuzenleYukle(no, ad, sinav, dogru, yanlis, bos, puan, derece) {
             tabAc('tab-ekle');
+            puanManuelDegistirildi = true;
             document.getElementById('ogrenci_no_input').value = no;
             document.getElementById('ad_input').value = ad;
             document.getElementById('sinav_input').value = sinav;
@@ -167,13 +195,22 @@
             <button id="btn-tab-ogrenciler" onclick="tabAc('tab-ogrenciler')" class="tab-btn bg-indigo-600 text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition shadow-sm">👥 Kayıtlı Öğrenciler</button>
             <button id="btn-tab-ekle" onclick="tabAc('tab-ekle')" class="tab-btn bg-white text-slate-700 border border-slate-300 px-5 py-2.5 rounded-2xl text-xs font-bold transition shadow-sm">➕ Öğrenci / Not Ekle</button>
             <button id="btn-tab-sinavlar" onclick="tabAc('tab-sinavlar')" class="tab-btn bg-white text-slate-700 border border-slate-300 px-5 py-2.5 rounded-2xl text-xs font-bold transition shadow-sm">📝 Sınav & Soru Yönetimi</button>
-            <button id="btn-tab-excel" onclick="tabAc('tab-excel')" class="tab-btn bg-white text-slate-700 border border-slate-300 px-5 py-2.5 rounded-2xl text-xs font-bold transition shadow-sm">📊 Excel & Yedekleme</button>
+            <button id="btn-tab-excel" onclick="tabAc('tab-excel')" class="tab-btn bg-white text-slate-700 border border-slate-300 px-5 py-2.5 rounded-2xl text-xs font-bold transition shadow-sm">📊 Excel & Temizlik</button>
         </div>
 
         <!-- 1. BÖLÜM -->
         <div id="tab-ogrenciler" class="tab-icerik bg-white p-6 rounded-3xl border border-slate-200 shadow-xl space-y-4">
             <h3 class="text-base font-black text-slate-900">Kayıtlı Öğrenciler (Numara Sıralı - Tıklayınca Açılır)</h3>
             <p class="text-xs text-slate-500">Öğrenciye tıklayarak sınavlarını görebilir, tek bir sınavı düzenleyebilir veya silebilirsiniz.</p>
+
+            {% if sinav_ortalamalari %}
+            <div class="flex flex-wrap gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                <span class="text-xs font-bold text-slate-600 self-center mr-1">Sınav Ortalamaları:</span>
+                {% for s_ad, ort in sinav_ortalamalari.items() %}
+                <span class="bg-white border border-slate-200 px-3 py-1 rounded-xl text-xs font-bold text-slate-800">{{ s_ad }}: <strong class="text-emerald-600">{{ ort }}</strong></span>
+                {% endfor %}
+            </div>
+            {% endif %}
 
             {% if veriler %}
             <div class="space-y-3 max-h-[600px] overflow-y-auto pr-1">
@@ -229,8 +266,14 @@
 
         <!-- 2. BÖLÜM -->
         <div id="tab-ekle" class="tab-icerik hidden bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xl space-y-4">
-            <h2 class="text-base font-black text-slate-900">Öğrenci & Not Ekle / Güncelle</h2>
-            <p class="text-xs text-slate-500">Boş bırakılan sayısal kutular otomatik 0 kabul edilir; diğer alanları sıfırlamaz. Aynı öğrenci ve sınav adıyla kaydettiğinizde mevcut kayıt güncellenir.</p>
+            <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+                <div>
+                    <h2 class="text-base font-black text-slate-900">Öğrenci & Not Ekle / Güncelle</h2>
+                    <p class="text-xs text-slate-500">Doğru, yanlış ve boş sayısına göre puan otomatik hesaplanır; dilerseniz puanı manuel de değiştirebilirsiniz.</p>
+                </div>
+                <button type="button" onclick="puanOtomatikHesapla(true)" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-xs font-bold transition self-start">🧮 Puanı Yeniden Hesapla</button>
+            </div>
+
             <form action="/admin/kaydet" method="POST" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <input type="text" id="ogrenci_no_input" name="ogrenci_no" required placeholder="Öğrenci No" onblur="ogrenciGetirNo()" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold">
 
@@ -256,11 +299,11 @@
                     </select>
                 </div>
 
-                <input type="number" id="dogru_input" name="dogru" placeholder="Doğru Sayısı (Boş = 0)" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs">
-                <input type="number" id="yanlis_input" name="yanlis" placeholder="Yanlış Sayısı (Boş = 0)" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs">
-                <input type="number" id="bos_input" name="bos" placeholder="Boş Sayısı (Boş = 0)" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs">
-                <input type="number" id="puan_input" name="puan" placeholder="Puan (Boş = 0)" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs">
-                <input type="text" id="derece_input" name="derece" placeholder="Derece (İsteğe bağlı: 1, 2, 3)" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs">
+                <input type="number" id="dogru_input" name="dogru" min="0" placeholder="Doğru Sayısı" oninput="puanOtomatikHesapla()" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs">
+                <input type="number" id="yanlis_input" name="yanlis" min="0" placeholder="Yanlış Sayısı" oninput="puanOtomatikHesapla()" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs">
+                <input type="number" id="bos_input" name="bos" min="0" placeholder="Boş Sayısı" oninput="puanOtomatikHesapla()" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs">
+                <input type="number" id="puan_input" name="puan" placeholder="Puan (Otomatik)" oninput="puanManuelIsaretle()" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold text-indigo-700">
+                <input type="text" id="derece_input" name="derece" placeholder="Derece (İsteğe bağlı: 1, 2, 3)" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs sm:col-span-2">
                 <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs sm:col-span-3 shadow">Kaydet / Güncelle 💾</button>
             </form>
         </div>
@@ -352,17 +395,33 @@
         </div>
 
         <!-- 4. BÖLÜM -->
-        <div id="tab-excel" class="tab-icerik hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-xl space-y-3">
-                <h3 class="text-xs font-bold text-slate-900">Excel Toplu Veri Yükleme</h3>
-                <form action="/admin/excel-yukle" method="POST" enctype="multipart/form-data" class="space-y-2">
-                    <input type="file" name="excel_dosya" required class="block w-full text-xs text-slate-500 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-slate-100 file:text-slate-700">
-                    <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-2 rounded-xl text-xs">Excel Yükle 📊</button>
-                </form>
+        <div id="tab-excel" class="tab-icerik hidden space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-xl space-y-3">
+                    <h3 class="text-xs font-bold text-slate-900">Excel Toplu Veri Yükleme</h3>
+                    <form action="/admin/excel-yukle" method="POST" enctype="multipart/form-data" class="space-y-2">
+                        <input type="file" name="excel_dosya" required class="block w-full text-xs text-slate-500 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-slate-100 file:text-slate-700">
+                        <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-2 rounded-xl text-xs">Excel Yükle 📊</button>
+                    </form>
+                </div>
+                <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-xl flex flex-col justify-between space-y-3">
+                    <h3 class="text-xs font-bold text-slate-900">Excel Yedek İndir</h3>
+                    <a href="/admin/excel-indir" class="block text-center bg-indigo-600 text-white font-bold py-2.5 rounded-xl text-xs">Excel Raporu İndir 📥</a>
+                </div>
             </div>
-            <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-xl flex flex-col justify-between space-y-3">
-                <h3 class="text-xs font-bold text-slate-900">Excel Yedek İndir</h3>
-                <a href="/admin/excel-indir" class="block text-center bg-indigo-600 text-white font-bold py-2.5 rounded-xl text-xs">Excel Raporu İndir 📥</a>
+
+            <div class="bg-white p-6 rounded-3xl border border-rose-200 shadow-xl space-y-3">
+                <h3 class="text-sm font-black text-slate-900">Belirli Bir Sınavın Not Kayıtlarını Toplu Temizle</h3>
+                <p class="text-xs text-slate-500">Yalnızca seçtiğiniz sınava ait not kayıtları silinir; öğrenci kartları ve diğer sınavlar etkilenmez.</p>
+                <form action="/admin/sinav-notlarini-temizle" method="POST" onsubmit="return confirm('Seçilen sınava ait tüm öğrenci not kayıtları silinecek. Emin misiniz?')" class="flex flex-col sm:flex-row gap-3">
+                    <select name="hedef_sinav" required class="flex-1 px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold">
+                        <option value="">-- Temizlenecek Sınavı Seçin --</option>
+                        {% for s_ad in sinav_ortalamalari.keys() %}
+                        <option value="{{ s_ad }}">{{ s_ad }} (Ort: {{ sinav_ortalamalari[s_ad] }})</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="bg-rose-600 hover:bg-rose-700 text-white font-bold px-5 py-2.5 rounded-xl text-xs transition shrink-0">Seçili Sınav Notlarını Sil 🧹</button>
+                </form>
             </div>
         </div>
 

@@ -31,6 +31,18 @@ TURKEY_TZ = timezone(timedelta(hours=3))
 db_pool = None
 
 
+def guvenli_int(deger, varsayilan=0):
+    if deger is None:
+        return varsayilan
+    metin = str(deger).strip()
+    if metin == "":
+        return varsayilan
+    try:
+        return int(float(metin.replace(",", ".")))
+    except Exception:
+        return varsayilan
+
+
 def havuz_baslat():
     global db_pool
     if db_pool is not None:
@@ -509,7 +521,7 @@ def coklu_soru_ekle():
         return redirect(url_for("admin_panel"))
 
     test_adi = request.form.get("test_adi", "").strip()
-    sure = int(request.form.get("sure", 30))
+    sure = guvenli_int(request.form.get("sure"), 30)
     soru_dosyasi = request.files.get("soru_dosyasi")
 
     if not test_adi:
@@ -569,7 +581,7 @@ def coklu_soru_ekle():
                         )
                         eklenen += 1
         else:
-            soru_sayisi = int(request.form.get("soru_sayisi", 1))
+            soru_sayisi = guvenli_int(request.form.get("soru_sayisi"), 1)
             for i in range(1, soru_sayisi + 1):
                 metin = request.form.get(f"soru_metni_{i}", "").strip()
                 a = request.form.get(f"secenek_a_{i}", "").strip()
@@ -693,15 +705,13 @@ def ogrenci_kaydet():
         return redirect(url_for("admin_panel"))
     no = request.form.get("ogrenci_no", "").strip()
     ad = request.form.get("ad", "").strip()
-    sinav = request.form.get("sinav", "Genel").strip()
+    sinav = request.form.get("sinav", "").strip() or "Genel"
     derece = request.form.get("derece", "").strip()
-    try:
-        dogru = int(request.form.get("dogru", 0))
-        yanlis = int(request.form.get("yanlis", 0))
-        bos = int(request.form.get("bos", 0))
-        puan = int(request.form.get("puan", 0))
-    except Exception:
-        dogru, yanlis, bos, puan = 0, 0, 0, 0
+
+    dogru = guvenli_int(request.form.get("dogru"), 0)
+    yanlis = guvenli_int(request.form.get("yanlis"), 0)
+    bos = guvenli_int(request.form.get("bos"), 0)
+    puan = guvenli_int(request.form.get("puan"), 0)
 
     if no and ad:
         conn = None
@@ -723,14 +733,37 @@ def ogrenci_kaydet():
             )
             conn.commit()
             cursor.close()
-            flash("Kayıt eklendi/güncellendi.", "success")
+            flash(f"'{no} - {ad}' için '{sinav}' sınav kaydı eklendi/güncellendi.", "success")
         except Exception as e:
             if conn:
                 conn.rollback()
             flash(f"Hata: {e}", "error")
         finally:
             db_birak(conn)
+    else:
+        flash("Öğrenci numarası ve ad soyad zorunludur.", "error")
     return redirect(url_for("admin_panel", tab="tab-ekle"))
+
+
+@app.route("/admin/sinav-sil/<int:sinav_id>")
+def sinav_sil(sinav_id):
+    if not session.get("admin_logged_in"):
+        return redirect(url_for("admin_panel"))
+    conn = None
+    try:
+        conn = db_baglantisi()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM sinavlar WHERE id = %s", (sinav_id,))
+        conn.commit()
+        cursor.close()
+        flash("Seçilen sınav kaydı silindi.", "info")
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        flash(f"Sınav silme hatası: {e}", "error")
+    finally:
+        db_birak(conn)
+    return redirect(url_for("admin_panel", tab="tab-ogrenciler"))
 
 
 @app.route("/admin/ogrenci-sil/<ogrenci_no>")
@@ -799,16 +832,13 @@ def excel_yukle():
                 if not no or no.lower() in ["nan", "none", "0", ""]:
                     continue
 
-                try:
-                    dogru = int(row[col_map["dogru"]]) if "dogru" in col_map and pd.notna(row[col_map["dogru"]]) else 0
-                    yanlis = int(row[col_map["yanlis"]]) if "yanlis" in col_map and pd.notna(row[col_map["yanlis"]]) else 0
-                    bos = int(row[col_map["bos"]]) if "bos" in col_map and pd.notna(row[col_map["bos"]]) else 0
-                    puan = int(row[col_map["puan"]]) if "puan" in col_map and pd.notna(row[col_map["puan"]]) else 0
-                    derece = str(row[col_map["derece"]]).strip() if "derece" in col_map and pd.notna(row[col_map["derece"]]) else ""
-                    if derece.lower() == "nan":
-                        derece = ""
-                except Exception:
-                    dogru, yanlis, bos, puan, derece = 0, 0, 0, 0, ""
+                dogru = guvenli_int(row[col_map["dogru"]], 0) if "dogru" in col_map and pd.notna(row[col_map["dogru"]]) else 0
+                yanlis = guvenli_int(row[col_map["yanlis"]], 0) if "yanlis" in col_map and pd.notna(row[col_map["yanlis"]]) else 0
+                bos = guvenli_int(row[col_map["bos"]], 0) if "bos" in col_map and pd.notna(row[col_map["bos"]]) else 0
+                puan = guvenli_int(row[col_map["puan"]], 0) if "puan" in col_map and pd.notna(row[col_map["puan"]]) else 0
+                derece = str(row[col_map["derece"]]).strip() if "derece" in col_map and pd.notna(row[col_map["derece"]]) else ""
+                if derece.lower() == "nan":
+                    derece = ""
 
                 cursor.execute(
                     "INSERT INTO ogrenciler (ogrenci_no, ad) VALUES (%s, %s) ON CONFLICT (ogrenci_no) DO UPDATE SET ad = EXCLUDED.ad",

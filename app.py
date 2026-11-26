@@ -1,6 +1,7 @@
 import io
 import os
 import re
+import time
 from datetime import datetime, timezone, timedelta
 import psycopg2
 from psycopg2 import pool
@@ -8,7 +9,6 @@ from psycopg2.extras import RealDictCursor
 from flask import (
     Flask,
     flash,
-    g,
     jsonify,
     redirect,
     render_template,
@@ -22,13 +22,24 @@ import pypdf
 import docx
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "uzman_ogretmen_guvenli_sistem_key_2026_v12")
+app.secret_key = os.environ.get("SECRET_KEY", "uzman_ogretmen_guvenli_sistem_key_2026_v13")
 
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "15698")
 DATABASE_URL = os.environ.get("DATABASE_URL")
 TURKEY_TZ = timezone(timedelta(hours=3))
 
+CACHE_TTL_SANIYE = 5.0
+_CACHE = {
+    "sinav_verileri": {"ts": 0.0, "data": None},
+    "sinav_adlari": {"ts": 0.0, "data": None},
+}
+
 db_pool = None
+
+
+def onbellek_temizle():
+    _CACHE["sinav_verileri"] = {"ts": 0.0, "data": None}
+    _CACHE["sinav_adlari"] = {"ts": 0.0, "data": None}
 
 
 def guvenli_int(deger, varsayilan=0):
@@ -108,6 +119,7 @@ def veritabani_kur():
             )
         """)
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_sinavlar_ogrenci_no ON sinavlar(ogrenci_no)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_sinavlar_sinav ON sinavlar(sinav)")
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS istatistikler (
@@ -186,8 +198,10 @@ def istatistik_getir():
 
 
 def sinav_verilerini_getir():
-    if hasattr(g, "sinav_verileri_cache"):
-        return g.sinav_verileri_cache
+    now = time.monotonic()
+    cached = _CACHE["sinav_verileri"]
+    if cached["data"] is not None and (now - cached["ts"]) < CACHE_TTL_SANIYE:
+        return cached["data"]
 
     conn = None
     try:
@@ -239,7 +253,7 @@ def sinav_verilerini_getir():
                     "derece": row["derece"],
                 })
 
-        g.sinav_verileri_cache = veriler
+        _CACHE["sinav_verileri"] = {"ts": now, "data": veriler}
         return veriler
     except Exception as e:
         print(f"Veri çekme hatası: {e}")
@@ -248,7 +262,33 @@ def sinav_verilerini_getir():
         db_birak(conn)
 
 
+def sinav_ortalamalarini_hesapla(sinav_verileri):
+    toplamlar = {}
+    adetler = {}
+    for _, bilgi in sinav_verileri.items():
+        for s in bilgi.get("sinavlar", []):
+            ad = s.get("sinav")
+            if not ad:
+                continue
+            puan = guvenli_int(s.get("puan"), 0)
+            toplamlar[ad] = toplamlar.get(ad, 0) + puan
+            adetler[ad] = adetler.get(ad, 0) + 1
+
+    ortalamalar = {}
+    for ad, toplam in toplamlar.items():
+        adet = adetler.get(ad, 0)
+        if adet > 0:
+            ort = toplam / adet
+            ortalamalar[ad] = round(ort, 1) if ort % 1 != 0 else int(ort)
+    return ortalamalar
+
+
 def tum_sinav_adlarini_getir():
+    now = time.monotonic()
+    cached = _CACHE["sinav_adlari"]
+    if cached["data"] is not None and (now - cached["ts"]) < CACHE_TTL_SANIYE:
+        return cached["data"]
+
     adlar = []
     conn = None
     try:
@@ -263,6 +303,7 @@ def tum_sinav_adlarini_getir():
             val = r.get("ad")
             if val and val not in adlar:
                 adlar.append(val)
+        _CACHE["sinav_adlari"] = {"ts": now, "data": adlar}
     except Exception as e:
         print(f"Sınav adları çekme hatası: {e}")
     finally:
@@ -291,6 +332,8 @@ def veli_sorgula():
             db_birak(conn)
 
     sinav_verileri = sinav_verilerini_getir()
+    sinav_ortalamalari = sinav_ortalamalarini_hesapla(sinav_verileri)
+
     aktif_testler = []
     conn = None
     try:
@@ -349,6 +392,7 @@ def veli_sorgula():
         hata=hata,
         en_son_derece=en_son_derece,
         aktif_testler=aktif_testler,
+        sinav_ortalamalari=sinav_ortalamalari,
     )
 
 
@@ -421,6 +465,7 @@ def online_sinav_coz(test_adi, ogrenci_no):
 
             conn.commit()
             cursor.close()
+            onbellek_temizle()
             flash(f"Sınav tamamlandı! Puanınız: {puan}", "success")
             return redirect(url_for("veli_sorgula"))
 
@@ -455,6 +500,7 @@ def admin_panel():
         return render_template("admin.html", giris_yapildi=False)
 
     sinav_verileri = sinav_verilerini_getir()
+    sinav_ortalamalari = sinav_ortalamalarini_hesapla(sinav_verileri)
     toplam_ziyaret, toplam_sorgu = istatistik_getir()
     tum_sorular, test_listesi = [], []
     aktif_tab = request.args.get("tab", "tab-ogrenciler")
@@ -478,6 +524,7 @@ def admin_panel():
         "admin.html",
         giris_yapildi=True,
         veriler=sinav_verileri,
+        sinav_ortalamalari=sinav_ortalamalari,
         tum_sorular=tum_sorular,
         test_listesi=test_listesi,
         toplam_ziyaret=toplam_ziyaret,
@@ -505,6 +552,7 @@ def sayaclari_sifirla():
         cursor.execute("UPDATE ogrenciler SET sorgu_sayisi = 0")
         conn.commit()
         cursor.close()
+        onbellek_temizle()
         flash("Tüm sayaçlar ve öğrenci sorgu sayıları başarıyla sıfırlandı!", "success")
     except Exception as e:
         if conn:
@@ -602,6 +650,7 @@ def coklu_soru_ekle():
 
         conn.commit()
         cursor.close()
+        onbellek_temizle()
         flash(f"'{test_adi}' testine toplam {eklenen} soru başarıyla eklendi!", "success")
     except Exception as e:
         if conn:
@@ -649,6 +698,7 @@ def test_sil(test_adi):
         cursor.execute("DELETE FROM test_ayarlari WHERE test_adi = %s", (test_adi,))
         conn.commit()
         cursor.close()
+        onbellek_temizle()
         flash(f"'{test_adi}' sınavı ve ilgili tüm sorular/sonuçlar silindi.", "info")
     except Exception as e:
         if conn:
@@ -711,7 +761,13 @@ def ogrenci_kaydet():
     dogru = guvenli_int(request.form.get("dogru"), 0)
     yanlis = guvenli_int(request.form.get("yanlis"), 0)
     bos = guvenli_int(request.form.get("bos"), 0)
-    puan = guvenli_int(request.form.get("puan"), 0)
+
+    puan_ham = request.form.get("puan", "").strip()
+    if puan_ham != "":
+        puan = guvenli_int(puan_ham, 0)
+    else:
+        toplam_soru = dogru + yanlis + bos
+        puan = round((dogru / toplam_soru) * 100) if toplam_soru > 0 else 0
 
     if no and ad:
         conn = None
@@ -733,7 +789,8 @@ def ogrenci_kaydet():
             )
             conn.commit()
             cursor.close()
-            flash(f"'{no} - {ad}' için '{sinav}' sınav kaydı eklendi/güncellendi.", "success")
+            onbellek_temizle()
+            flash(f"'{no} - {ad}' için '{sinav}' sınav kaydı eklendi/güncellendi (Puan: {puan}).", "success")
         except Exception as e:
             if conn:
                 conn.rollback()
@@ -743,6 +800,34 @@ def ogrenci_kaydet():
     else:
         flash("Öğrenci numarası ve ad soyad zorunludur.", "error")
     return redirect(url_for("admin_panel", tab="tab-ekle"))
+
+
+@app.route("/admin/sinav-notlarini-temizle", methods=["POST"])
+def sinav_notlarini_temizle():
+    if not session.get("admin_logged_in"):
+        return redirect(url_for("admin_panel"))
+    hedef_sinav = request.form.get("hedef_sinav", "").strip()
+    if not hedef_sinav:
+        flash("Lütfen temizlenecek sınavı seçiniz.", "error")
+        return redirect(url_for("admin_panel", tab="tab-excel"))
+
+    conn = None
+    try:
+        conn = db_baglantisi()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM sinavlar WHERE sinav = %s", (hedef_sinav,))
+        silinen_adet = cursor.rowcount
+        conn.commit()
+        cursor.close()
+        onbellek_temizle()
+        flash(f"'{hedef_sinav}' sınavına ait {silinen_adet} not kaydı temizlendi.", "info")
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        flash(f"Sınav notları temizlenirken hata oluştu: {e}", "error")
+    finally:
+        db_birak(conn)
+    return redirect(url_for("admin_panel", tab="tab-excel"))
 
 
 @app.route("/admin/sinav-sil/<int:sinav_id>")
@@ -756,6 +841,7 @@ def sinav_sil(sinav_id):
         cursor.execute("DELETE FROM sinavlar WHERE id = %s", (sinav_id,))
         conn.commit()
         cursor.close()
+        onbellek_temizle()
         flash("Seçilen sınav kaydı silindi.", "info")
     except Exception as e:
         if conn:
@@ -778,6 +864,7 @@ def ogrenci_sil(ogrenci_no):
         cursor.execute("DELETE FROM ogrenciler WHERE ogrenci_no = %s", (str(ogrenci_no),))
         conn.commit()
         cursor.close()
+        onbellek_temizle()
         flash("Öğrenci silindi.", "info")
     except Exception:
         if conn:
@@ -857,6 +944,7 @@ def excel_yukle():
 
             conn.commit()
             cursor.close()
+            onbellek_temizle()
             flash(f"Excel başarıyla işlendi! {eklenen} kayıt eklendi/güncellendi.", "success")
         except Exception as e:
             if conn:

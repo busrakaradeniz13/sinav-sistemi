@@ -6,6 +6,13 @@
     <title>Öğrenci Sınav Sonuç & Online Sınav Ekranı</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        @keyframes kutlamaParlama {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.012); }
+        }
+        .kutlama-animasyon {
+            animation: kutlamaParlama 2.4s ease-in-out infinite;
+        }
         @media print {
             .no-print {
                 display: none !important;
@@ -115,6 +122,59 @@
 
         <!-- ÖĞRENCİ KARNE VE SONUÇ EKRANI -->
         {% if sonuc %}
+        {% set son_sinav_adi = sonuc.sinavlar[0].sinav if sonuc.sinavlar else '' %}
+
+        <!-- 1, 2 VE 3. DERECE KUTLAMA MESAJI -->
+        {% if en_son_derece == "1" %}
+        <div class="kutlama-animasyon bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-slate-950 p-5 sm:p-6 rounded-3xl border border-amber-300 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-4 text-center sm:text-left">
+                <div class="text-4xl shrink-0">🎉🥇🎉</div>
+                <div>
+                    <span class="bg-white/90 text-amber-900 px-3 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider inline-block mb-1">Zirve Başarısı • 1. Derece</span>
+                    <h3 class="text-lg sm:text-xl font-black">Tebrikler {{ sonuc.ad }}!</h3>
+                    <p class="text-xs sm:text-sm font-bold text-amber-950/90 mt-0.5">
+                        {% if son_sinav_adi %}<strong>{{ son_sinav_adi }}</strong> sınavında{% else %}Son sınavında{% endif %} <strong>1. olarak</strong> harika bir başarıya imza attın! Emeklerinin karşılığını gönülden kutluyoruz.
+                    </p>
+                </div>
+            </div>
+            <div class="bg-white/90 text-amber-900 px-4 py-2 rounded-2xl text-xs font-black shrink-0 shadow-sm">
+                🏆 1. SIRA
+            </div>
+        </div>
+        {% elif en_son_derece == "2" %}
+        <div class="kutlama-animasyon bg-gradient-to-r from-slate-200 via-indigo-100 to-slate-200 text-slate-900 p-5 sm:p-6 rounded-3xl border border-slate-300 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-4 text-center sm:text-left">
+                <div class="text-4xl shrink-0">🎊🥈🎊</div>
+                <div>
+                    <span class="bg-white text-indigo-800 border border-indigo-200 px-3 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider inline-block mb-1">Büyük Başarı • 2. Derece</span>
+                    <h3 class="text-lg sm:text-xl font-black">Harikasın {{ sonuc.ad }}!</h3>
+                    <p class="text-xs sm:text-sm font-bold text-slate-700 mt-0.5">
+                        {% if son_sinav_adi %}<strong>{{ son_sinav_adi }}</strong> sınavında{% else %}Son sınavında{% endif %} <strong>2. olarak</strong> üst sıralarda yer aldın! Bu güçlü performansın için seni tebrik ederiz.
+                    </p>
+                </div>
+            </div>
+            <div class="bg-white text-indigo-800 border border-indigo-200 px-4 py-2 rounded-2xl text-xs font-black shrink-0 shadow-sm">
+                🥈 2. SIRA
+            </div>
+        </div>
+        {% elif en_son_derece == "3" %}
+        <div class="kutlama-animasyon bg-gradient-to-r from-orange-200 via-amber-100 to-orange-200 text-orange-950 p-5 sm:p-6 rounded-3xl border border-orange-300 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-4 text-center sm:text-left">
+                <div class="text-4xl shrink-0">👏🥉👏</div>
+                <div>
+                    <span class="bg-white text-orange-900 border border-orange-200 px-3 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider inline-block mb-1">Kürsü Başarısı • 3. Derece</span>
+                    <h3 class="text-lg sm:text-xl font-black">Kutlarız {{ sonuc.ad }}!</h3>
+                    <p class="text-xs sm:text-sm font-bold text-orange-900/90 mt-0.5">
+                        {% if son_sinav_adi %}<strong>{{ son_sinav_adi }}</strong> sınavında{% else %}Son sınavında{% endif %} <strong>3. olarak</strong> ilk üç dereceye girmeyi başardın! Gayretini ve başarını alkışlıyoruz.
+                    </p>
+                </div>
+            </div>
+            <div class="bg-white text-orange-900 border border-orange-200 px-4 py-2 rounded-2xl text-xs font-black shrink-0 shadow-sm">
+                🥉 3. SIRA
+            </div>
+        </div>
+        {% endif %}
+
         {% set sinav_sayisi = sonuc.sinavlar|length if sonuc.sinavlar else 0 %}
         {% set ns = namespace(puan_toplam=0, dogru_toplam=0, yanlis_toplam=0, bos_toplam=0) %}
         {% if sonuc.sinavlar %}

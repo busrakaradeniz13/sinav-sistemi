@@ -9,10 +9,10 @@
         function ogrenciGetirNo() {
             let no = document.getElementById('ogrenci_no_input').value.trim();
             if(!no) return;
-            fetch('/admin/ogrenci-ara/' + no)
+            fetch('/admin/ogrenci-ara/' + encodeURIComponent(no))
                 .then(res => res.json())
                 .then(data => {
-                    if(data.bulundu) {
+                    if(data.bulundu && !document.getElementById('ad_input').value.trim()) {
                         document.getElementById('ad_input').value = data.ad;
                     }
                 });
@@ -22,7 +22,7 @@
             let selectedOption = selectElement.options[selectElement.selectedIndex];
             let no = selectedOption.getAttribute('data-no');
             let ad = selectedOption.value;
-            
+
             if(no) {
                 document.getElementById('ogrenci_no_input').value = no;
                 document.getElementById('ad_input').value = ad;
@@ -36,6 +36,19 @@
             }
         }
 
+        function sinavDuzenleYukle(no, ad, sinav, dogru, yanlis, bos, puan, derece) {
+            tabAc('tab-ekle');
+            document.getElementById('ogrenci_no_input').value = no;
+            document.getElementById('ad_input').value = ad;
+            document.getElementById('sinav_input').value = sinav;
+            document.getElementById('dogru_input').value = dogru;
+            document.getElementById('yanlis_input').value = yanlis;
+            document.getElementById('bos_input').value = bos;
+            document.getElementById('puan_input').value = puan;
+            document.getElementById('derece_input').value = derece || '';
+            document.getElementById('tab-ekle').scrollIntoView({ behavior: 'smooth' });
+        }
+
         function tabAc(tabId) {
             document.querySelectorAll('.tab-icerik').forEach(el => el.classList.add('hidden'));
             document.querySelectorAll('.tab-btn').forEach(el => {
@@ -44,7 +57,7 @@
             });
             let secilen = document.getElementById(tabId);
             if(secilen) secilen.classList.remove('hidden');
-            
+
             let btn = document.getElementById('btn-' + tabId);
             if(btn) {
                 btn.classList.remove('bg-white', 'text-slate-700', 'border-slate-300');
@@ -65,12 +78,12 @@
                 container.innerHTML += `
                     <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
                         <div class="font-bold text-xs text-indigo-700">Soru ${i}</div>
-                        <input type="text" name="soru_metni_${i}" required placeholder="${i}. Soru cümlesi..." class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-xs font-medium">
+                        <input type="text" name="soru_metni_${i}" placeholder="${i}. Soru cümlesi..." class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-xs font-medium">
                         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                            <input type="text" name="secenek_a_${i}" required placeholder="A Şıkkı" class="px-3 py-1.5 rounded-xl bg-white border border-slate-300 text-xs">
-                            <input type="text" name="secenek_b_${i}" required placeholder="B Şıkkı" class="px-3 py-1.5 rounded-xl bg-white border border-slate-300 text-xs">
-                            <input type="text" name="secenek_c_${i}" required placeholder="C Şıkkı" class="px-3 py-1.5 rounded-xl bg-white border border-slate-300 text-xs">
-                            <input type="text" name="secenek_d_${i}" required placeholder="D Şıkkı" class="px-3 py-1.5 rounded-xl bg-white border border-slate-300 text-xs">
+                            <input type="text" name="secenek_a_${i}" placeholder="A Şıkkı" class="px-3 py-1.5 rounded-xl bg-white border border-slate-300 text-xs">
+                            <input type="text" name="secenek_b_${i}" placeholder="B Şıkkı" class="px-3 py-1.5 rounded-xl bg-white border border-slate-300 text-xs">
+                            <input type="text" name="secenek_c_${i}" placeholder="C Şıkkı" class="px-3 py-1.5 rounded-xl bg-white border border-slate-300 text-xs">
+                            <input type="text" name="secenek_d_${i}" placeholder="D Şıkkı" class="px-3 py-1.5 rounded-xl bg-white border border-slate-300 text-xs">
                         </div>
                         <div class="flex items-center gap-2">
                             <span class="text-xs font-bold text-slate-600">Doğru Cevap:</span>
@@ -110,7 +123,7 @@
 
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}{% for cat, msg in messages %}
-            <div class="p-3 rounded-xl text-xs font-bold text-center border {% if cat == 'success' %}bg-emerald-50 border-emerald-200 text-emerald-700{% else %}bg-sky-50 border-sky-200 text-sky-700{% endif %}">{{ msg }}</div>
+            <div class="p-3 rounded-xl text-xs font-bold text-center border {% if cat == 'success' %}bg-emerald-50 border-emerald-200 text-emerald-700{% elif cat == 'error' %}bg-rose-50 border-rose-200 text-rose-700{% else %}bg-sky-50 border-sky-200 text-sky-700{% endif %}">{{ msg }}</div>
           {% endfor %}{% endif %}
         {% endwith %}
 
@@ -160,7 +173,7 @@
         <!-- 1. BÖLÜM -->
         <div id="tab-ogrenciler" class="tab-icerik bg-white p-6 rounded-3xl border border-slate-200 shadow-xl space-y-4">
             <h3 class="text-base font-black text-slate-900">Kayıtlı Öğrenciler (Numara Sıralı - Tıklayınca Açılır)</h3>
-            <p class="text-xs text-slate-500">Öğrenciye tıklayarak tüm sınav sonuçlarını görebilirsiniz.</p>
+            <p class="text-xs text-slate-500">Öğrenciye tıklayarak sınavlarını görebilir, tek bir sınavı düzenleyebilir veya silebilirsiniz.</p>
 
             {% if veriler %}
             <div class="space-y-3 max-h-[600px] overflow-y-auto pr-1">
@@ -181,15 +194,23 @@
                     <div id="detay_{{ no }}" class="hidden p-4 bg-white border-t border-slate-200 space-y-3">
                         <div class="flex justify-between items-center border-b border-slate-100 pb-2">
                             <span class="text-xs font-bold text-indigo-700">Sınav Sonuçları ve Geçmiş Karneleri</span>
-                            <a href="/admin/ogrenci-sil/{{ no }}" onclick="return confirm('Öğrenciyi silmek istediğinize emin misiniz?')" class="text-rose-600 text-xs font-bold hover:underline">Öğrenciyi Sil 🗑️</a>
+                            <a href="/admin/ogrenci-sil/{{ no }}" onclick="return confirm('Öğrenciyi ve tüm sınavlarını silmek istediğinize emin misiniz?')" class="text-rose-600 text-xs font-bold hover:underline">Öğrenciyi Sil 🗑️</a>
                         </div>
                         {% if bilgi.sinavlar %}
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             {% for s in bilgi.sinavlar %}
-                            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs flex justify-between items-center">
+                            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs flex justify-between items-center gap-2">
                                 <div>
                                     <div class="font-bold text-slate-800">{{ s.sinav }}</div>
                                     <div class="text-[11px] text-slate-500">D: {{ s.dogru }} | Y: {{ s.yanlis }} | B: {{ s.bos }} | Puan: <strong class="text-indigo-600">{{ s.puan }}</strong> {% if s.derece %}| Sıra: <strong class="text-amber-600">{{ s.derece }}</strong>{% endif %}</div>
+                                </div>
+                                <div class="flex items-center gap-1.5 shrink-0">
+                                    <button type="button" onclick='sinavDuzenleYukle("{{ no }}", {{ bilgi.ad|tojson }}, {{ s.sinav|tojson }}, {{ s.dogru }}, {{ s.yanlis }}, {{ s.bos }}, {{ s.puan }}, {{ (s.derece or "")|tojson }})' class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-2.5 py-1 rounded-lg text-[11px] font-bold transition">
+                                        Düzenle ✏️
+                                    </button>
+                                    <a href="/admin/sinav-sil/{{ s.id }}" onclick="return confirm('Bu sınav kaydını silmek istediğinize emin misiniz?')" class="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-2.5 py-1 rounded-lg text-[11px] font-bold transition">
+                                        Sil 🗑️
+                                    </a>
                                 </div>
                             </div>
                             {% endfor %}
@@ -209,12 +230,13 @@
         <!-- 2. BÖLÜM -->
         <div id="tab-ekle" class="tab-icerik hidden bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xl space-y-4">
             <h2 class="text-base font-black text-slate-900">Öğrenci & Not Ekle / Güncelle</h2>
+            <p class="text-xs text-slate-500">Boş bırakılan sayısal kutular otomatik 0 kabul edilir; diğer alanları sıfırlamaz. Aynı öğrenci ve sınav adıyla kaydettiğinizde mevcut kayıt güncellenir.</p>
             <form action="/admin/kaydet" method="POST" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <input type="text" id="ogrenci_no_input" name="ogrenci_no" required placeholder="Öğrenci No" onblur="ogrenciGetirNo()" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold">
-                
+
                 <!-- Ad Soyad: Hem Yaz hem Seç -->
                 <div class="flex gap-1">
-                    <input type="text" id="ad_input" name="ad" required placeholder="Ad Soyad (Yeni yazabilirsiniz)" onblur="ogrenciGetirNo()" class="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold">
+                    <input type="text" id="ad_input" name="ad" required placeholder="Ad Soyad (Yeni yazabilirsiniz)" class="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold">
                     <select onchange="ogrenciSecAd(this)" title="Kayıtlı Öğrencilerden Seç" class="bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-xl px-2 text-xs cursor-pointer font-bold">
                         <option value="">Kayıtlı Seç ▾</option>
                         {% for no, b in veriler.items() %}
@@ -234,11 +256,11 @@
                     </select>
                 </div>
 
-                <input type="number" name="dogru" placeholder="Doğru Sayısı" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs">
-                <input type="number" name="yanlis" placeholder="Yanlış Sayısı" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs">
-                <input type="number" name="bos" placeholder="Boş Sayısı" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs">
-                <input type="number" name="puan" placeholder="Puan" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs">
-                <input type="text" name="derece" placeholder="Derece (1, 2, 3)" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs">
+                <input type="number" id="dogru_input" name="dogru" placeholder="Doğru Sayısı (Boş = 0)" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs">
+                <input type="number" id="yanlis_input" name="yanlis" placeholder="Yanlış Sayısı (Boş = 0)" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs">
+                <input type="number" id="bos_input" name="bos" placeholder="Boş Sayısı (Boş = 0)" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs">
+                <input type="number" id="puan_input" name="puan" placeholder="Puan (Boş = 0)" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs">
+                <input type="text" id="derece_input" name="derece" placeholder="Derece (İsteğe bağlı: 1, 2, 3)" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs">
                 <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs sm:col-span-3 shadow">Kaydet / Güncelle 💾</button>
             </form>
         </div>
@@ -252,7 +274,6 @@
 
             <form action="/admin/coklu-soru-ekle" method="POST" enctype="multipart/form-data" class="space-y-4">
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <!-- Sınav Adı Ekleme: Hem Yaz hem Seç -->
                     <div>
                         <label class="block text-xs font-bold text-slate-600 mb-1">Test / Sınav Adı</label>
                         <div class="flex gap-1">

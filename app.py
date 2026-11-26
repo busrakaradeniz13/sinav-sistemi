@@ -22,7 +22,7 @@ import pypdf
 import docx
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "uzman_ogretmen_guvenli_sistem_key_2026_v13")
+app.secret_key = os.environ.get("SECRET_KEY", "uzman_ogretmen_guvenli_sistem_key_2026_v14")
 
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "15698")
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -54,17 +54,21 @@ def guvenli_int(deger, varsayilan=0):
         return varsayilan
 
 
-def havuz_baslat():
-    global db_pool
-    if db_pool is not None:
-        return db_pool
+def _dsn_hazirla():
     if not DATABASE_URL:
         raise Exception("DATABASE_URL ortam değişkeni bulunamadı!")
-
-    url = DATABASE_URL
+    url = DATABASE_URL.strip()
     if "sslmode" not in url:
         url += "?sslmode=require" if "?" not in url else "&sslmode=require"
+    return url
 
+
+def havuz_baslat():
+    global db_pool
+    if db_pool is not None and not getattr(db_pool, "closed", False):
+        return db_pool
+
+    url = _dsn_hazirla()
     db_pool = pool.ThreadedConnectionPool(
         minconn=1,
         maxconn=10,
@@ -74,24 +78,68 @@ def havuz_baslat():
     return db_pool
 
 
+def _baglanti_canli_mi(conn):
+    if conn is None or getattr(conn, "closed", 1) != 0:
+        return False
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1")
+        return True
+    except Exception:
+        return False
+
+
 def db_baglantisi():
     p = havuz_baslat()
+    conn = p.getconn()
+    if _baglanti_canli_mi(conn):
+        return conn
+
+    # Kapanmış/kopmuş bağlantıyı havuzdan atıp yenisini al
+    try:
+        p.putconn(conn, close=True)
+    except Exception:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
     return p.getconn()
 
 
-def db_birak(conn):
-    if conn is not None and db_pool is not None:
+def guvenli_rollback(conn):
+    if conn is None or getattr(conn, "closed", 1) != 0:
+        return
+    try:
+        conn.rollback()
+    except Exception:
+        pass
+
+
+def db_birak(conn, bozuk=False):
+    if conn is None:
+        return
+    p = db_pool
+    if p is None or getattr(p, "closed", False):
         try:
-            db_pool.putconn(conn)
+            conn.close()
         except Exception:
-            try:
-                conn.close()
-            except Exception:
-                pass
+            pass
+        return
+
+    kapat = bozuk or (getattr(conn, "closed", 1) != 0)
+    try:
+        p.putconn(conn, close=kapat)
+    except Exception:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 def veritabani_kur():
     conn = None
+    bozuk = False
     try:
         conn = db_baglantisi()
         cursor = conn.cursor()
@@ -168,11 +216,11 @@ def veritabani_kur():
         conn.commit()
         cursor.close()
     except Exception as e:
-        if conn:
-            conn.rollback()
+        bozuk = True
+        guvenli_rollback(conn)
         print(f"DB Kurulum Hatası: {e}")
     finally:
-        db_birak(conn)
+        db_birak(conn, bozuk=bozuk)
 
 
 veritabani_kur()
@@ -181,6 +229,7 @@ veritabani_kur()
 def istatistik_getir():
     toplam_ziyaret, toplam_sorgu = 0, 0
     conn = None
+    bozuk = False
     try:
         conn = db_baglantisi()
         cursor = conn.cursor()
@@ -191,9 +240,11 @@ def istatistik_getir():
             toplam_sorgu = res["toplam_sorgu"]
         cursor.close()
     except Exception as e:
+        bozuk = True
+        guvenli_rollback(conn)
         print(f"İstatistik çekme hatası: {e}")
     finally:
-        db_birak(conn)
+        db_birak(conn, bozuk=bozuk)
     return toplam_ziyaret, toplam_sorgu
 
 
@@ -204,6 +255,7 @@ def sinav_verilerini_getir():
         return cached["data"]
 
     conn = None
+    bozuk = False
     try:
         conn = db_baglantisi()
         cursor = conn.cursor()
@@ -256,10 +308,12 @@ def sinav_verilerini_getir():
         _CACHE["sinav_verileri"] = {"ts": now, "data": veriler}
         return veriler
     except Exception as e:
+        bozuk = True
+        guvenli_rollback(conn)
         print(f"Veri çekme hatası: {e}")
-        return {}
+        return cached["data"] if cached["data"] is not None else {}
     finally:
-        db_birak(conn)
+        db_birak(conn, bozuk=bozuk)
 
 
 def sinav_ortalamalarini_hesapla(sinav_verileri):
@@ -291,6 +345,7 @@ def tum_sinav_adlarini_getir():
 
     adlar = []
     conn = None
+    bozuk = False
     try:
         conn = db_baglantisi()
         cursor = conn.cursor()
@@ -305,9 +360,13 @@ def tum_sinav_adlarini_getir():
                 adlar.append(val)
         _CACHE["sinav_adlari"] = {"ts": now, "data": adlar}
     except Exception as e:
+        bozuk = True
+        guvenli_rollback(conn)
         print(f"Sınav adları çekme hatası: {e}")
+        if cached["data"] is not None:
+            return cached["data"]
     finally:
-        db_birak(conn)
+        db_birak(conn, bozuk=bozuk)
     return adlar
 
 
@@ -318,6 +377,7 @@ def veli_sorgula():
 
     if request.method == "GET" and not session.get("ziyaret_sayildi"):
         conn = None
+        bozuk = False
         try:
             conn = db_baglantisi()
             cursor = conn.cursor()
@@ -325,27 +385,31 @@ def veli_sorgula():
             conn.commit()
             cursor.close()
             session["ziyaret_sayildi"] = True
-        except Exception:
-            if conn:
-                conn.rollback()
+        except Exception as e:
+            bozuk = True
+            guvenli_rollback(conn)
+            print(f"Ziyaret sayaç hatası: {e}")
         finally:
-            db_birak(conn)
+            db_birak(conn, bozuk=bozuk)
 
     sinav_verileri = sinav_verilerini_getir()
     sinav_ortalamalari = sinav_ortalamalarini_hesapla(sinav_verileri)
 
     aktif_testler = []
     conn = None
+    bozuk = False
     try:
         conn = db_baglantisi()
         cursor = conn.cursor()
         cursor.execute("SELECT test_adi, sure_dakika FROM test_ayarlari WHERE yayinlandi = TRUE")
         aktif_testler = cursor.fetchall()
         cursor.close()
-    except Exception:
-        pass
+    except Exception as e:
+        bozuk = True
+        guvenli_rollback(conn)
+        print(f"Aktif test çekme hatası: {e}")
     finally:
-        db_birak(conn)
+        db_birak(conn, bozuk=bozuk)
 
     if request.method == "POST":
         ogrenci_no = request.form.get("ogrenci_no", "").strip()
@@ -353,6 +417,7 @@ def veli_sorgula():
             hata = "Lütfen okul numarası giriniz."
         elif ogrenci_no in sinav_verileri:
             s_conn = None
+            s_bozuk = False
             try:
                 su_an_tsi = datetime.now(TURKEY_TZ).strftime("%d.%m.%Y %H:%M")
                 s_conn = db_baglantisi()
@@ -369,11 +434,11 @@ def veli_sorgula():
                 s_conn.commit()
                 s_cur.close()
             except Exception as e:
-                if s_conn:
-                    s_conn.rollback()
+                s_bozuk = True
+                guvenli_rollback(s_conn)
                 print(f"Sorgu sayaç güncelleme hatası: {e}")
             finally:
-                db_birak(s_conn)
+                db_birak(s_conn, bozuk=s_bozuk)
 
             ham = sinav_verileri[ogrenci_no]
             sonuc = {"ogrenci_no": ogrenci_no, "ad": ham["ad"], "sinavlar": ham["sinavlar"]}
@@ -404,6 +469,7 @@ def online_sinav_coz(test_adi, ogrenci_no):
         return redirect(url_for("veli_sorgula"))
 
     conn = None
+    bozuk = False
     try:
         conn = db_baglantisi()
         cursor = conn.cursor()
@@ -480,12 +546,12 @@ def online_sinav_coz(test_adi, ogrenci_no):
             daha_once=daha_once,
         )
     except Exception as e:
-        if conn:
-            conn.rollback()
+        bozuk = True
+        guvenli_rollback(conn)
         flash(f"Sınav hatası: {e}", "error")
         return redirect(url_for("veli_sorgula"))
     finally:
-        db_birak(conn)
+        db_birak(conn, bozuk=bozuk)
 
 
 @app.route("/admin", methods=["GET", "POST"])
@@ -507,6 +573,7 @@ def admin_panel():
     kayitli_dersler = tum_sinav_adlarini_getir()
 
     conn = None
+    bozuk = False
     try:
         conn = db_baglantisi()
         cursor = conn.cursor()
@@ -516,9 +583,11 @@ def admin_panel():
         test_listesi = cursor.fetchall()
         cursor.close()
     except Exception as e:
+        bozuk = True
+        guvenli_rollback(conn)
         print(f"Admin veri çekme hatası: {e}")
     finally:
-        db_birak(conn)
+        db_birak(conn, bozuk=bozuk)
 
     return render_template(
         "admin.html",
@@ -545,6 +614,7 @@ def sayaclari_sifirla():
     if not session.get("admin_logged_in"):
         return redirect(url_for("admin_panel"))
     conn = None
+    bozuk = False
     try:
         conn = db_baglantisi()
         cursor = conn.cursor()
@@ -555,11 +625,11 @@ def sayaclari_sifirla():
         onbellek_temizle()
         flash("Tüm sayaçlar ve öğrenci sorgu sayıları başarıyla sıfırlandı!", "success")
     except Exception as e:
-        if conn:
-            conn.rollback()
+        bozuk = True
+        guvenli_rollback(conn)
         flash(f"Sıfırlama hatası: {e}", "error")
     finally:
-        db_birak(conn)
+        db_birak(conn, bozuk=bozuk)
     return redirect(url_for("admin_panel", tab="tab-ogrenciler"))
 
 
@@ -577,6 +647,7 @@ def coklu_soru_ekle():
         return redirect(url_for("admin_panel", tab="tab-sinavlar"))
 
     conn = None
+    bozuk = False
     try:
         conn = db_baglantisi()
         cursor = conn.cursor()
@@ -653,11 +724,11 @@ def coklu_soru_ekle():
         onbellek_temizle()
         flash(f"'{test_adi}' testine toplam {eklenen} soru başarıyla eklendi!", "success")
     except Exception as e:
-        if conn:
-            conn.rollback()
+        bozuk = True
+        guvenli_rollback(conn)
         flash(f"Soru ekleme hatası: {e}", "error")
     finally:
-        db_birak(conn)
+        db_birak(conn, bozuk=bozuk)
 
     return redirect(url_for("admin_panel", tab="tab-sinavlar"))
 
@@ -667,6 +738,7 @@ def test_yayinla(test_adi):
     if not session.get("admin_logged_in"):
         return redirect(url_for("admin_panel"))
     conn = None
+    bozuk = False
     try:
         conn = db_baglantisi()
         cursor = conn.cursor()
@@ -677,11 +749,12 @@ def test_yayinla(test_adi):
             cursor.execute("UPDATE test_ayarlari SET yayinlandi = %s WHERE test_adi = %s", (yeni, test_adi))
             conn.commit()
         cursor.close()
-    except Exception:
-        if conn:
-            conn.rollback()
+    except Exception as e:
+        bozuk = True
+        guvenli_rollback(conn)
+        print(f"Yayın durumu hatası: {e}")
     finally:
-        db_birak(conn)
+        db_birak(conn, bozuk=bozuk)
     return redirect(url_for("admin_panel", tab="tab-sinavlar"))
 
 
@@ -690,6 +763,7 @@ def test_sil(test_adi):
     if not session.get("admin_logged_in"):
         return redirect(url_for("admin_panel"))
     conn = None
+    bozuk = False
     try:
         conn = db_baglantisi()
         cursor = conn.cursor()
@@ -701,11 +775,11 @@ def test_sil(test_adi):
         onbellek_temizle()
         flash(f"'{test_adi}' sınavı ve ilgili tüm sorular/sonuçlar silindi.", "info")
     except Exception as e:
-        if conn:
-            conn.rollback()
+        bozuk = True
+        guvenli_rollback(conn)
         flash(f"Sınav silme hatası: {e}", "error")
     finally:
-        db_birak(conn)
+        db_birak(conn, bozuk=bozuk)
     return redirect(url_for("admin_panel", tab="tab-sinavlar"))
 
 
@@ -714,6 +788,7 @@ def soru_sil(soru_id):
     if not session.get("admin_logged_in"):
         return redirect(url_for("admin_panel"))
     conn = None
+    bozuk = False
     try:
         conn = db_baglantisi()
         cursor = conn.cursor()
@@ -721,11 +796,12 @@ def soru_sil(soru_id):
         conn.commit()
         cursor.close()
         flash("Soru silindi.", "info")
-    except Exception:
-        if conn:
-            conn.rollback()
+    except Exception as e:
+        bozuk = True
+        guvenli_rollback(conn)
+        print(f"Soru silme hatası: {e}")
     finally:
-        db_birak(conn)
+        db_birak(conn, bozuk=bozuk)
     return redirect(url_for("admin_panel", tab="tab-sinavlar"))
 
 
@@ -734,6 +810,7 @@ def ogrenci_ara(ogrenci_no):
     if not session.get("admin_logged_in"):
         return jsonify({"bulundu": False})
     conn = None
+    bozuk = False
     try:
         conn = db_baglantisi()
         cursor = conn.cursor()
@@ -743,9 +820,10 @@ def ogrenci_ara(ogrenci_no):
         if row:
             return jsonify({"bulundu": True, "ad": row["ad"]})
     except Exception:
-        pass
+        bozuk = True
+        guvenli_rollback(conn)
     finally:
-        db_birak(conn)
+        db_birak(conn, bozuk=bozuk)
     return jsonify({"bulundu": False})
 
 
@@ -771,6 +849,7 @@ def ogrenci_kaydet():
 
     if no and ad:
         conn = None
+        bozuk = False
         try:
             conn = db_baglantisi()
             cursor = conn.cursor()
@@ -792,11 +871,11 @@ def ogrenci_kaydet():
             onbellek_temizle()
             flash(f"'{no} - {ad}' için '{sinav}' sınav kaydı eklendi/güncellendi (Puan: {puan}).", "success")
         except Exception as e:
-            if conn:
-                conn.rollback()
+            bozuk = True
+            guvenli_rollback(conn)
             flash(f"Hata: {e}", "error")
         finally:
-            db_birak(conn)
+            db_birak(conn, bozuk=bozuk)
     else:
         flash("Öğrenci numarası ve ad soyad zorunludur.", "error")
     return redirect(url_for("admin_panel", tab="tab-ekle"))
@@ -812,6 +891,7 @@ def sinav_notlarini_temizle():
         return redirect(url_for("admin_panel", tab="tab-excel"))
 
     conn = None
+    bozuk = False
     try:
         conn = db_baglantisi()
         cursor = conn.cursor()
@@ -822,11 +902,11 @@ def sinav_notlarini_temizle():
         onbellek_temizle()
         flash(f"'{hedef_sinav}' sınavına ait {silinen_adet} not kaydı temizlendi.", "info")
     except Exception as e:
-        if conn:
-            conn.rollback()
+        bozuk = True
+        guvenli_rollback(conn)
         flash(f"Sınav notları temizlenirken hata oluştu: {e}", "error")
     finally:
-        db_birak(conn)
+        db_birak(conn, bozuk=bozuk)
     return redirect(url_for("admin_panel", tab="tab-excel"))
 
 
@@ -835,6 +915,7 @@ def sinav_sil(sinav_id):
     if not session.get("admin_logged_in"):
         return redirect(url_for("admin_panel"))
     conn = None
+    bozuk = False
     try:
         conn = db_baglantisi()
         cursor = conn.cursor()
@@ -844,11 +925,11 @@ def sinav_sil(sinav_id):
         onbellek_temizle()
         flash("Seçilen sınav kaydı silindi.", "info")
     except Exception as e:
-        if conn:
-            conn.rollback()
+        bozuk = True
+        guvenli_rollback(conn)
         flash(f"Sınav silme hatası: {e}", "error")
     finally:
-        db_birak(conn)
+        db_birak(conn, bozuk=bozuk)
     return redirect(url_for("admin_panel", tab="tab-ogrenciler"))
 
 
@@ -857,6 +938,7 @@ def ogrenci_sil(ogrenci_no):
     if not session.get("admin_logged_in"):
         return redirect(url_for("admin_panel"))
     conn = None
+    bozuk = False
     try:
         conn = db_baglantisi()
         cursor = conn.cursor()
@@ -866,11 +948,12 @@ def ogrenci_sil(ogrenci_no):
         cursor.close()
         onbellek_temizle()
         flash("Öğrenci silindi.", "info")
-    except Exception:
-        if conn:
-            conn.rollback()
+    except Exception as e:
+        bozuk = True
+        guvenli_rollback(conn)
+        print(f"Öğrenci silme hatası: {e}")
     finally:
-        db_birak(conn)
+        db_birak(conn, bozuk=bozuk)
     return redirect(url_for("admin_panel", tab="tab-ogrenciler"))
 
 
@@ -881,6 +964,7 @@ def excel_yukle():
     dosya = request.files.get("excel_dosya")
     if dosya and dosya.filename:
         conn = None
+        bozuk = False
         try:
             df = pd.read_excel(dosya)
             col_map = {}
@@ -947,11 +1031,11 @@ def excel_yukle():
             onbellek_temizle()
             flash(f"Excel başarıyla işlendi! {eklenen} kayıt eklendi/güncellendi.", "success")
         except Exception as e:
-            if conn:
-                conn.rollback()
+            bozuk = True
+            guvenli_rollback(conn)
             flash(f"Excel yükleme hatası: {e}", "error")
         finally:
-            db_birak(conn)
+            db_birak(conn, bozuk=bozuk)
     return redirect(url_for("admin_panel", tab="tab-excel"))
 
 
